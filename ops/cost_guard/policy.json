@@ -1,0 +1,29 @@
+{
+  "currency": "INR",
+  "monthly_net_target": "5",
+  "spend_alerts": ["1", "2", "3", "4", "5"],
+  "warning_fraction": "0.5",
+  "calendar_timezone": "America/Los_Angeles",
+  "quota_alert_review": "2027-08-01",
+  "quota_alert_sunset": "2027-08-31",
+  "meters": [
+    {
+      "name": "requests",
+      "metric": "run.googleapis.com/request_count",
+      "monthly_free": "2000000",
+      "divisor": "1"
+    },
+    {
+      "name": "cpu_seconds",
+      "metric": "run.googleapis.com/container/billable_instance_time",
+      "monthly_free": "180000",
+      "divisor": "1"
+    },
+    {
+      "name": "memory_gib_seconds",
+      "metric": "run.googleapis.com/container/billable_instance_time",
+      "monthly_free": "360000",
+      "divisor": "2"
+    }
+  ]
+}

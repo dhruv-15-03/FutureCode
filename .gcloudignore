@@ -1,0 +1,10 @@
+.gcloudignore
+.git/
+#!include:.gitignore
+certs/
+*.pem
+*.key
+*.p12
+*.jks
+*.hprof
+*.log

@@ -1,0 +1,12 @@
+[
+  {
+    "name": "delete-older-owned-builds",
+    "action": {"type": "Delete"},
+    "condition": {"tagState": "any", "olderThan": "86400s"}
+  },
+  {
+    "name": "keep-latest-per-image",
+    "action": {"type": "Keep"},
+    "mostRecentVersions": {"keepCount": 1}
+  }
+]

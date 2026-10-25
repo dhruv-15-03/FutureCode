@@ -14,3 +14,6 @@ playwright-report/
 target/
 .idea/
 *.iml
+__pycache__/
+*.py[cod]
+.venv/

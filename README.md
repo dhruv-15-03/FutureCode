@@ -8,9 +8,11 @@ The user-selected **Annotated casebook** interface uses warm near-black reading 
 
 ## Current verification boundary
 
-**P0 deployment hold:** the user requires an absolute maximum INR 5 total bill for the designated Google Cloud hosting project, across all services. This supersedes earlier INR 10 targets and acceptance of residual billing risk. No paid activation, API enablement, resource creation or deployment may proceed under an approximate budget safeguard. Google spend-cap/billing automation is delayed and cannot guarantee this ceiling. No INR 5 cloud enforcement setting has been configured or verified; this is an agent/release policy, not a claim of cloud-side protection.
+**Hosting authorization, updated 25 October 2026:** the user approved Cloud Run with layered protections and acknowledged possible overage. INR 5 is now an **estimated monthly net-spend shutdown target, not a guaranteed invoice ceiling**. The user explicitly chose to consume the free allowance first, then receive INR 1/2/3/4/5 alerts and trigger the project billing protector at INR 5. This supersedes the earlier absolute-INR-5 deployment hold. Scope is one explicitly approved GCP project and this repository only; never close the entire billing account or modify other projects. Setup is in progress, not yet a verified cloud deployment.
 
-The backend is **Java 21 + Spring Boot 4.0.9**, with Spring MVC, Spring Security/Nimbus ID-token verification, JDBC/HikariCP, Flyway, and MySQL 8+. The existing browser application and its casebook design are preserved. There is no Node production server, Python service, ORM, or AI-key vault.
+The user subsequently selected the dedicated **`futurecode-512719`** project. The deployment manifest and runtime guardian target only that project. Do not deploy or configure shutdown in the formerly discussed project.
+
+The backend is **Java 21 + Spring Boot 4.0.9**, with Spring MVC, Spring Security/Nimbus ID-token verification, JDBC/HikariCP, Flyway, and MySQL 8+. The application remains Java, without a Node server, ORM or AI-key vault. The separate Python cost guardian under `ops\cost_guard` is infrastructure automation, not an application or AI backend.
 
 MySQL persistence, Google sign-in, ownership controls and browser workflows are implemented. **The isolated `FutureTool` schema is verified at version 3 with 13 tables, certificate/hostname-verified TLS and rollback-only checks covering core, community and integration storage.** No probe records were retained and the saved credentials file was unchanged. The separate opt-in test remains skipped until a dedicated `_test` database is supplied. Google/AI/runner/payment transports use synthetic tests; independent real OAuth and live-provider lifecycles remain unverified.
 
@@ -248,9 +250,9 @@ The in-memory rate limits/cache assume a **single application instance**. Multi-
 
 ### Cloud Run recommendation and free-tier limits
 
-**Not approved under the current P0 INR 5 ceiling.** The technical evaluation below is background only, not authorization to deploy, activate billing or accept overage risk.
+**Approved as a best-effort cost-controlled deployment, not a hard cap.** Create only resources for the approved project/repository, establish protection before public traffic, and fail closed on billing-currency or scope mismatches.
 
-Cloud Run can technically host **both the browser UI and Spring backend in the same container**. MySQL remains a separate managed database. That technical fit does not guarantee that hosting will stay within the required absolute project-wide bill limit.
+Cloud Run hosts **both the browser UI and Spring backend in the same container**. MySQL remains the existing external database. The cost guardian is an additional private Cloud Run service. Builds, registry storage, secrets, scheduler, Pub/Sub and monitoring are separate products even though the application has one public service.
 
 The following were checked against original provider documentation on 25 October 2026:
 
@@ -262,7 +264,7 @@ The following were checked against original provider documentation on 25 October
 | MySQL | Keep the already configured service if its plan/limits fit. Cloud SQL's trial/credits are not a permanent free MySQL hosting plan. |
 | Aiven free MySQL alternative | The published free plan has 1 CPU, 1 GB RAM, 1 GB disk, and a 76-connection limit, but can be powered off for inactivity and has no 99.99% SLA. It does not satisfy a literal never-shuts-down requirement. |
 
-Technical starting settings for a future deployment only if its financial policy is explicitly changed:
+User-approved starting settings:
 
 | Cloud Run setting | Initial value |
 | --- | --- |
@@ -276,11 +278,21 @@ Technical starting settings for a future deployment only if its financial policy
 | Google OAuth | Add the exact production `APP_ORIGIN/auth/google/callback` URI to the existing web client |
 | Secret handling | Use secret-manager environment/file references for credentials and the CA; never bake `.env` or certificate/key files into the image |
 
-Choose a region close to the database and users after checking its price tier. No extra frontend host or custom domain is required for the first release. Build the existing Dockerfile, use the generated HTTPS service URL, run migrations explicitly from a trusted host, and verify readiness and a real Google login after deployment. No cloud resources or billing configuration were changed here.
+Use Tier 1 `us-central1` for the initial controlled deployment. No extra frontend host or custom domain is required. Build only committed public source, mount credentials through Secret Manager, run migrations from the trusted local host, and verify readiness plus real Google login after deployment.
 
 Maximum instances is a cost-control setting, not a strict spend cap; the platform can briefly exceed it. Cold starts also reset this application's in-memory rate limits/cache. Request-based billing includes the active time of long AI requests even while waiting on the provider. Builds, image storage, secret operations, logs, and network egress have separate pricing/free allowances; in particular, Cloud Run's documented free internet-egress allowance is 1 GiB within North America, not an unrestricted worldwide allowance.
 
 Ordinary budget alerts are notifications, not a guarantee of no charges. Google now also documents **spend cap budgets for Cloud Run**, but they deliberately pause new usage after the cap is triggered. They operate on gross estimated cost before discounts/credits, not simply the net bill after the Free Tier, and do not stop all persistent-resource or in-flight charges. A zero-value cap is not a way to consume the whole free allowance while guaranteeing uninterrupted service. Do not promise both unconditional zero spend and uninterrupted service.
+
+The chosen policy deliberately does **not** apply a native INR 5 gross cap: that could stop free usage before the requested net-spend sequence. A single-project monthly billing budget includes credits and has five current-spend thresholds (20/40/60/80/100%). Its Pub/Sub notifications drive the authenticated cost guardian, which unlinks billing **only for the fixed target project** when estimated net cost is at least INR 5. Billing data is delayed, taxes can differ from estimates, and already-incurred costs cannot be recalled. Disabling billing also stops the guardian; re-enabling is a deliberate operator action.
+
+Free-usage warnings use month-to-date Cloud Monitoring request counts and billable instance time. Both owned services must retain the fixed 1-vCPU/512-MiB request-based profile with startup CPU boost disabled; CPU seconds equal billable instance seconds and memory GiB-seconds are half that value. Warnings trigger at 1,000,000 requests, 90,000 CPU-seconds or 180,000 GiB-seconds. These are project workload estimates, not an authoritative billing-account free-credit balance. Free allowances can be shared with other projects; internet transfer is not treated as a universal free allowance.
+
+The optional quota email uses a log-based alert, an hourly scheduler message and deduplicated state, not per-keystroke monitoring or a paid synthetic monitor. Cloud Monitoring announces alert-pricing changes no sooner than September 2027. The guardian warns in August 2027 and disables this optional alert by 31 August unless its pricing is reviewed and the policy updated; billing emails and the spend protector continue independently.
+
+Deployment tooling is under `ops\gcp`; the guardian is under `ops\cost_guard`. It requires an authenticated Google CLI, a separate local Python environment with `ops\cost_guard\requirements.txt`, and Java for the private configuration exporter. Validate operations code with `python -m unittest discover -s ops\tests -v`. The exporter selects only the existing database/OAuth fields and generates a separate production session secret; it never changes the local `.env`. Cloud Build receives a clean committed Git archive, not the working folder or local secrets. The two runtime secrets are mounted through Secret Manager and inaccessible to the cost guardian.
+
+Set `FUTURECODE_APPROVED_GCP_PROJECT=futurecode-512719`, then run `ops\gcp\deploy.py --project=futurecode-512719 --phase=plan`. The `protect` and `app` phases also require `--accept-estimated-target-risk` and a `--state-file` path outside the repository. Protection is provisioned before the public app. The operation's restricted service account can unlink only this project's billing; it has no billing-account administrator role and cannot stop unrelated projects. The application account can read only its two named secrets.
 
 Sources: [Cloud Run pricing](https://cloud.google.com/run/pricing), [Google Cloud Free Tier and trial lifecycle](https://docs.cloud.google.com/free/docs/free-cloud-features), [autoscaling](https://docs.cloud.google.com/run/docs/about-instance-autoscaling), [container contract](https://docs.cloud.google.com/run/docs/container-contract), [maximum instances](https://docs.cloud.google.com/run/docs/configuring/max-instances), [billing budgets](https://docs.cloud.google.com/billing/docs/how-to/budgets), [spend cap budgets](https://docs.cloud.google.com/billing/docs/how-to/budgets-spend-caps), [Cloud SQL pricing](https://cloud.google.com/sql/pricing), and [Aiven MySQL free-plan limits and inactivity policy](https://aiven.io/docs/products/mysql/concepts/mysql-free-tier).
 
@@ -321,7 +333,7 @@ TLS rules still apply. This opt-in test applies the owned migrations, creates un
 
 ## Launch gates still outside this build
 
-The configured MySQL service has passed verified-TLS connection, `FutureTool` provisioning/migrations and rollback-only repository checks. Still independently verify real Google sign-in/callback/sign-out; make separately consented AI/runner calls; validate merchant checkout/webhooks in test mode before enabling payments; review Docker packaging on the actual host; supply operator contact/retention details; and observe three actual candidates use the simulation. Cloud deployment remains blocked by P0. Automated journeys are not human observations, provider certification or proven learning outcomes.
+The configured MySQL service has passed verified-TLS connection, `FutureTool` provisioning/migrations and rollback-only repository checks. Still verify the cloud deployment and its protection configuration, real Google sign-in/callback/sign-out, separately consented AI/runner calls, merchant test-mode checkout before enabling payments, operator contact/retention details and three actual candidate observations. Automated journeys are not human observations, provider certification or proven learning outcomes.
 
 Before adding more content or paid infrastructure, check whether candidates can explain their findings and return to practice. Google/Canva-style skills are the target, not a claimed official question bank or a salary guarantee.
 
