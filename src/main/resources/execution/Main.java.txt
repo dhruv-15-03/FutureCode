@@ -1,0 +1,49 @@
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+
+public final class Main {
+  public static void main(String[] args) throws Exception {
+    RequestCounter counter = new RequestCounter();
+    RequestController controller = new RequestController(counter);
+    controller.handle("/checkout", () -> {});
+    try {
+      controller.handle("/checkout", () -> { throw new IllegalStateException("fixture"); });
+      throw new AssertionError("handler exception swallowed");
+    } catch (IllegalStateException expected) {}
+    equal("completed success and failure", 2, counter.countFor("/checkout"));
+    counter.record("/health");
+    equal("independent route", 1, counter.countFor("/health"));
+    equal("checkout unchanged", 2, counter.countFor("/checkout"));
+    RequestCounter overlap = new RequestCounter(new ReadBarrierMap());
+    AtomicReference<Throwable> failure = new AtomicReference<>();
+    Runnable record = () -> {
+      try { overlap.record("/checkout"); }
+      catch (Throwable error) { failure.compareAndSet(null, error); }
+    };
+    Thread a = new Thread(record, "case-worker-a"), b = new Thread(record, "case-worker-b");
+    a.start(); b.start(); a.join(3000); b.join(3000);
+    if (a.isAlive() || b.isAlive()) { a.interrupt(); b.interrupt(); throw new AssertionError("workers did not finish"); }
+    if (failure.get() != null) throw new AssertionError(failure.get());
+    equal("controlled overlap", 2, overlap.countFor("/checkout"));
+    System.out.println("PASS: FutureCode counter regression v1");
+  }
+  private static void equal(String name, int expected, int actual) {
+    if (actual != expected) throw new AssertionError(name + ": expected=" + expected + " actual=" + actual);
+  }
+  private static final class ReadBarrierMap extends ConcurrentHashMap<String, Integer> {
+    private final CountDownLatch reads = new CountDownLatch(2);
+    @Override public Integer getOrDefault(Object key, Integer fallback) {
+      Integer value = super.getOrDefault(key, fallback);
+      if (Thread.currentThread().getName().startsWith("case-worker-")) {
+        reads.countDown();
+        try {
+          if (!reads.await(2, TimeUnit.SECONDS)) System.err.println("Harness note: the read path serialized or scheduling exceeded two seconds; overlap was not forced. Review synchronization separately.");
+        }
+        catch (InterruptedException error) { Thread.currentThread().interrupt(); throw new AssertionError(error); }
+      }
+      return value;
+    }
+  }
+}

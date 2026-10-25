@@ -1,0 +1,426 @@
+{
+  "challenges": [
+    {
+      "id": "alias",
+      "title": "The list that changed twice",
+      "kind": "Predict behavior",
+      "level": "Warm-up",
+      "time": "3 min",
+      "concept": "References & mutation",
+      "file": "Alias.java",
+      "code": "import java.util.*;\n\nclass Alias {\n  public static void main(String[] args) {\n    List<String> original = new ArrayList<>(List.of(\"A\"));\n    List<String> alias = original;\n    List<String> copy = new ArrayList<>(original);\n    alias.add(\"B\");\n    copy.add(\"C\");\n    System.out.println(original);\n    System.out.println(copy);\n  }\n}",
+      "questions": [
+        {
+          "prompt": "What do the two println calls output, in order?",
+          "options": [
+            "[A, B] then [A, C]",
+            "[A] then [A, C]",
+            "[A, B, C] then [A, B, C]",
+            "[A, B] then [A, B, C]"
+          ],
+          "correctIndex": 0,
+          "explanation": "alias and original reference the same list. copy is a new list containing the original elements at the time of construction. Adding B changes original; adding C changes only copy.",
+          "lines": [
+            6,
+            7,
+            8,
+            9
+          ]
+        }
+      ]
+    },
+    {
+      "id": "finally",
+      "title": "Follow the return value",
+      "kind": "Trace lines",
+      "level": "Intermediate",
+      "time": "4 min",
+      "concept": "Control flow & finally",
+      "file": "ReturnTrace.java",
+      "code": "class ReturnTrace {\n  static int calculate() {\n    int value = 1;\n    try {\n      value = 2;\n      return value;\n    } finally {\n      value = 3;\n      System.out.print(value + \" \");\n    }\n  }\n  public static void main(String[] args) {\n    System.out.println(calculate());\n  }\n}",
+      "questions": [
+        {
+          "prompt": "Which trace explains the output?",
+          "options": [
+            "Line 6 returns immediately; output is 2",
+            "Line 8 changes the returned value; output is 3 3",
+            "Line 6 captures 2, finally prints 3, then main prints 2",
+            "finally runs before try; output is 3 2"
+          ],
+          "correctIndex": 2,
+          "explanation": "The return expression is evaluated at line 6, capturing the primitive value 2. The finally block then executes and prints 3 plus a space. Changing the local variable does not change the already captured return value. Output: 3 2.",
+          "lines": [
+            6,
+            8,
+            9,
+            13
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cache",
+      "title": "A cache that forgets its keys",
+      "kind": "Diagnose defect",
+      "level": "Intermediate",
+      "time": "5 min",
+      "concept": "HashMap & mutable keys",
+      "file": "SessionCache.java",
+      "code": "import java.util.*;\n\nclass Key {\n  int id;\n  Key(int id) { this.id = id; }\n  public int hashCode() { return id; }\n  public boolean equals(Object o) {\n    return o instanceof Key && ((Key) o).id == id;\n  }\n}\n// Inside a method:\nMap<Key, String> cache = new HashMap<>();\nKey key = new Key(1);\ncache.put(key, \"session\");\nkey.id = 2;\nSystem.out.println(cache.get(key));",
+      "questions": [
+        {
+          "prompt": "In this example the lookup returns null. What is the root cause and reliable fix?",
+          "options": [
+            "HashMap compares only identity; use TreeMap",
+            "The hash changes after insertion; make equality/hash fields immutable",
+            "get deletes expired values; use containsKey",
+            "The map is too small; increase initial capacity"
+          ],
+          "correctIndex": 1,
+          "explanation": "HashMap stores the insertion hash. Changing id changes hashCode and makes the lookup hash differ from the stored hash, even for the same object. Use immutable key identity (for example, a final id) or remove the key before mutation and reinsert it.",
+          "lines": [
+            4,
+            6,
+            14,
+            15,
+            16
+          ]
+        }
+      ]
+    },
+    {
+      "id": "boundary",
+      "title": "Catch the missing last item",
+      "kind": "Select regression test",
+      "level": "Warm-up",
+      "time": "3 min",
+      "concept": "Boundary cases & test design",
+      "file": "Totals.java",
+      "code": "class Totals {\n  static int total(int[] prices) {\n    int sum = 0;\n    for (int i = 0; i < prices.length - 1; i++) {\n      sum += prices[i];\n    }\n    return sum;\n  }\n}",
+      "questions": [
+        {
+          "prompt": "Which smallest test fails now and passes when the loop uses i < prices.length?",
+          "options": [
+            "total(new int[]{}) == 0",
+            "total(new int[]{0}) == 0",
+            "total(new int[]{7}) == 7",
+            "total(new int[]{0, 0}) == 0"
+          ],
+          "correctIndex": 2,
+          "explanation": "A singleton nonzero array isolates the skipped final element. The buggy loop never runs and returns 0 rather than 7. Empty arrays and zero-only inputs mask the defect.",
+          "lines": [
+            4,
+            5
+          ]
+        }
+      ]
+    },
+    {
+      "id": "patch",
+      "title": "The AI patch that loses updates",
+      "kind": "Critique AI patch",
+      "level": "Advanced",
+      "time": "6 min",
+      "concept": "Concurrency & atomicity",
+      "file": "RequestCounter.java",
+      "code": "import java.util.concurrent.*;\n\nclass RequestCounter {\n  // AI patch: replace HashMap with ConcurrentHashMap.\n  private final ConcurrentHashMap<String, Integer> counts =\n      new ConcurrentHashMap<>();\n\n  void record(String route) {\n    int previous = counts.getOrDefault(route, 0);\n    counts.put(route, previous + 1);\n  }\n}",
+      "questions": [
+        {
+          "prompt": "Two threads call record(\"/api\") concurrently. What did the AI patch miss?",
+          "options": [
+            "ConcurrentHashMap is never thread-safe",
+            "The read-modify-write is not atomic; use counts.merge(route, 1, Integer::sum)",
+            "Integer must be replaced by int",
+            "getOrDefault always returns zero for concurrent maps"
+          ],
+          "correctIndex": 1,
+          "explanation": "Individual map operations are safe, but two threads can read the same previous count and both write the same incremented count. merge performs the update atomically for this key. A concurrent collection alone does not make a multi-step algorithm atomic.",
+          "lines": [
+            9,
+            10
+          ]
+        }
+      ]
+    }
+  ],
+  "practiceCase": {
+    "id": "missing-requests-v1",
+    "title": "The missing requests",
+    "duration": "20-30 minutes",
+    "summary": "The request log says 10,000 requests completed. The traffic report counts fewer. A confident AI proposal claims to fix the race. Investigate before accepting it.",
+    "requirements": [
+      "Count every completed handler invocation once, including handlers that throw.",
+      "Keep counts independent for each route, with concurrent calls allowed.",
+      "Read a report only after the relevant handlers have completed.",
+      "Prefer per-key coordination; do not serialize unrelated routes without explaining the tradeoff."
+    ],
+    "assumptions": [
+      "Java 17+; a framework-neutral service excerpt, not a complete HTTP application.",
+      "One shared RequestCounter instance is injected into both services.",
+      "Routes are canonical non-null strings; counts remain within the integer range.",
+      "Incident observations are authored practice fixtures, not a live load test."
+    ],
+    "observations": [
+      [
+        "Sequential /checkout run",
+        "2,000 completed",
+        "report: 2,000"
+      ],
+      [
+        "Concurrent /checkout run",
+        "10,000 completed",
+        "report: 7,421"
+      ],
+      [
+        "Repeat concurrent run",
+        "10,000 completed",
+        "report: 7,806"
+      ],
+      [
+        "Success + failed handler",
+        "2 completed",
+        "report: 2 (sequential)"
+      ]
+    ],
+    "files": [
+      {
+        "name": "RequestController.java",
+        "role": "Request completion boundary",
+        "source": "public final class RequestController {\n  private final RequestCounter counter;\n\n  public RequestController(RequestCounter counter) {\n    this.counter = counter;\n  }\n\n  public void handle(String route, Runnable handler) {\n    try {\n      handler.run();\n    } finally {\n      counter.record(route);\n    }\n  }\n}"
+      },
+      {
+        "name": "RequestCounter.java",
+        "role": "Shared per-route state",
+        "source": "import java.util.concurrent.ConcurrentHashMap;\nimport java.util.concurrent.ConcurrentMap;\n\npublic final class RequestCounter {\n  private final ConcurrentMap<String, Integer> counts;\n\n  public RequestCounter() {\n    this(new ConcurrentHashMap<>());\n  }\n\n  RequestCounter(ConcurrentMap<String, Integer> counts) {\n    this.counts = counts;\n  }\n\n  public void record(String route) {\n    int previous = counts.getOrDefault(route, 0);\n    counts.put(route, previous + 1);\n  }\n\n  public int countFor(String route) {\n    return counts.getOrDefault(route, 0);\n  }\n}"
+      },
+      {
+        "name": "TrafficReportService.java",
+        "role": "Reporting read path",
+        "source": "public final class TrafficReportService {\n  private final RequestCounter counter;\n\n  public TrafficReportService(RequestCounter counter) {\n    this.counter = counter;\n  }\n\n  public TrafficReport snapshot(String route) {\n    return new TrafficReport(route, counter.countFor(route));\n  }\n}"
+      },
+      {
+        "name": "TrafficReport.java",
+        "role": "Immutable report value",
+        "source": "public record TrafficReport(String route, int completedRequests) {}"
+      },
+      {
+        "name": "RequestCounterTest.java",
+        "role": "Controlled regression fixture",
+        "source": "import java.util.concurrent.ConcurrentHashMap;\nimport java.util.concurrent.CountDownLatch;\nimport java.util.concurrent.TimeUnit;\nimport java.util.concurrent.atomic.AtomicReference;\n\npublic final class RequestCounterTest {\n  public static void main(String[] args) throws Exception {\n    RequestCounter counter = new RequestCounter();\n    RequestController controller = new RequestController(counter);\n    controller.handle(\"/checkout\", () -> {});\n    try {\n      controller.handle(\"/checkout\", () -> {\n        throw new IllegalStateException(\"handler failed\");\n      });\n      throw new AssertionError(\"handler exception was swallowed\");\n    } catch (IllegalStateException expected) {\n      // A completed failed handler is counted too.\n    }\n    equal(\"success-and-failure\", 2,\n        new TrafficReportService(counter).snapshot(\"/checkout\").completedRequests());\n    counter.record(\"/health\");\n    equal(\"route-isolation\", 1, counter.countFor(\"/health\"));\n    equal(\"checkout-unchanged\", 2, counter.countFor(\"/checkout\"));\n\n    int actual = forcedOverlap();\n    System.out.println(\"forced-overlap expected=2 actual=\" + actual);\n    equal(\"forced-overlap\", 2, actual);\n    System.out.println(\"PASS: all reference checks\");\n  }\n\n  private static int forcedOverlap() throws Exception {\n    RequestCounter counter = new RequestCounter(new ReadBarrierMap());\n    AtomicReference<Throwable> failure = new AtomicReference<>();\n    Runnable record = () -> {\n      try {\n        counter.record(\"/checkout\");\n      } catch (Throwable error) {\n        failure.compareAndSet(null, error);\n      }\n    };\n    Thread a = new Thread(record, \"case-worker-a\");\n    Thread b = new Thread(record, \"case-worker-b\");\n    a.start();\n    b.start();\n    a.join(3000);\n    b.join(3000);\n    if (a.isAlive() || b.isAlive()) {\n      a.interrupt();\n      b.interrupt();\n      throw new AssertionError(\"worker did not finish\");\n    }\n    if (failure.get() != null) throw new AssertionError(failure.get());\n    return counter.countFor(\"/checkout\");\n  }\n\n  private static void equal(String name, int expected, int actual) {\n    System.out.println(name + \" expected=\" + expected + \" actual=\" + actual);\n    if (actual != expected) throw new AssertionError(name);\n  }\n\n  // Test-only scheduling: both workers observe the old value before either returns.\n  private static final class ReadBarrierMap\n      extends ConcurrentHashMap<String, Integer> {\n    private final CountDownLatch reads = new CountDownLatch(2);\n\n    @Override\n    public Integer getOrDefault(Object key, Integer fallback) {\n      Integer value = super.getOrDefault(key, fallback);\n      if (Thread.currentThread().getName().startsWith(\"case-worker-\")) {\n        reads.countDown();\n        try {\n          if (!reads.await(2, TimeUnit.SECONDS)) {\n            throw new AssertionError(\"second read did not arrive\");\n          }\n        } catch (InterruptedException error) {\n          Thread.currentThread().interrupt();\n          throw new AssertionError(error);\n        }\n      }\n      return value;\n    }\n  }\n}"
+      }
+    ],
+    "proposal": {
+      "label": "Seeded AI proposal",
+      "disclosure": "An authored practice proposal, not a live model response. Assess its claim against the case.",
+      "claim": "Use compare-and-replace so concurrent requests cannot overwrite each other. One conditional replacement is enough; no retry is necessary.",
+      "code": "  public void record(String route) {\n    counts.putIfAbsent(route, 0);\n    int previous = counts.getOrDefault(route, 0);\n    counts.replace(route, previous, previous + 1);\n  }"
+    },
+    "hints": [
+      "Trace the finally block into the shared counter, then follow the reporting read path. A failed handler still reaches finally.",
+      "Try making both requests read the same old count before either writes. A concurrent map does not make the whole sequence atomic.",
+      "A conditional replace can return false. If that result is ignored, which completed request contributed no increment? An atomic merge is one repair."
+    ],
+    "reference": {
+      "explanation": "Both requests can read 0 and then each write 1. The map safely performs each individual operation, but the read-modify-write sequence is not atomic. The proposed compare-and-replace still loses an increment when one replacement fails and its false return is ignored.",
+      "flow": "RequestController.handle runs the handler, then finally records completion even on an exception. RequestCounter owns the shared per-route map. TrafficReportService reads that same counter after completion and returns an immutable TrafficReport.",
+      "fix": "Use ConcurrentHashMap.merge for the per-route increment. A correctly retried compare-and-replace loop or a lock covering the entire read/write can also be correct; discuss contention and ownership.",
+      "counterSource": "import java.util.concurrent.ConcurrentHashMap;\nimport java.util.concurrent.ConcurrentMap;\n\npublic final class RequestCounter {\n  private final ConcurrentMap<String, Integer> counts;\n\n  public RequestCounter() {\n    this(new ConcurrentHashMap<>());\n  }\n\n  RequestCounter(ConcurrentMap<String, Integer> counts) {\n    this.counts = counts;\n  }\n\n  public void record(String route) {\n    counts.merge(route, 1, Integer::sum);\n  }\n\n  public int countFor(String route) {\n    return counts.getOrDefault(route, 0);\n  }\n}",
+      "proposedCounterSource": "import java.util.concurrent.ConcurrentHashMap;\nimport java.util.concurrent.ConcurrentMap;\n\npublic final class RequestCounter {\n  private final ConcurrentMap<String, Integer> counts;\n\n  public RequestCounter() {\n    this(new ConcurrentHashMap<>());\n  }\n\n  RequestCounter(ConcurrentMap<String, Integer> counts) {\n    this.counts = counts;\n  }\n\n  public void record(String route) {\n    counts.putIfAbsent(route, 0);\n    int previous = counts.getOrDefault(route, 0);\n    counts.replace(route, previous, previous + 1);\n  }\n\n  public int countFor(String route) {\n    return counts.getOrDefault(route, 0);\n  }\n}",
+      "test": "Force both workers to observe the initial value before either write. The required final count is 2. The original method and seeded proposal both yield 1 under this schedule. The reference merge yields 2. Also preserve failed-handler counting and route isolation.",
+      "review": [
+        [
+          "Code understanding",
+          "Does the explanation connect completion, shared state, and reporting across files, including the exception path?"
+        ],
+        [
+          "Diagnosis",
+          "Does the reasoning show a legal interleaving rather than merely naming concurrency?"
+        ],
+        [
+          "AI judgment",
+          "Does the critique identify the ignored false result of replace and verify the proposal instead of trusting its confidence?"
+        ],
+        [
+          "Patch reasoning",
+          "Does the written patch actually implement an atomic per-route update and explain tradeoffs? This needs review; it is not parsed or run."
+        ],
+        [
+          "Verification quality",
+          "Does the proposed test control overlap, assert 2, preserve error-path counting, and isolate routes? Written test code is not run."
+        ]
+      ]
+    }
+  },
+  "exerciseSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "title",
+      "assumptions",
+      "questions"
+    ],
+    "properties": {
+      "title": {
+        "type": "string"
+      },
+      "assumptions": {
+        "type": "array",
+        "maxItems": 4,
+        "items": {
+          "type": "string"
+        }
+      },
+      "questions": {
+        "type": "array",
+        "minItems": 3,
+        "maxItems": 3,
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "prompt",
+            "options",
+            "correctIndex",
+            "explanation",
+            "evidence",
+            "verification"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "trace",
+                "risk",
+                "test"
+              ]
+            },
+            "prompt": {
+              "type": "string"
+            },
+            "options": {
+              "type": "array",
+              "minItems": 4,
+              "maxItems": 4,
+              "items": {
+                "type": "string"
+              }
+            },
+            "correctIndex": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 3
+            },
+            "explanation": {
+              "type": "string"
+            },
+            "evidence": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 3,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "line",
+                  "quote"
+                ],
+                "properties": {
+                  "line": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "quote": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "verification": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  },
+  "coachSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "reply",
+      "assumptions",
+      "citations"
+    ],
+    "properties": {
+      "reply": {
+        "type": "string"
+      },
+      "assumptions": {
+        "type": "array",
+        "maxItems": 3,
+        "items": {
+          "type": "string"
+        }
+      },
+      "citations": {
+        "type": "array",
+        "maxItems": 3,
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "file",
+            "line",
+            "quote"
+          ],
+          "properties": {
+            "file": {
+              "type": "string",
+              "enum": [
+                "RequestController.java",
+                "RequestCounter.java",
+                "TrafficReportService.java",
+                "TrafficReport.java",
+                "RequestCounterTest.java"
+              ]
+            },
+            "line": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "quote": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  },
+  "limits": {
+    "artifacts": {
+      "flow": 2000,
+      "questions": 1000,
+      "critique": 2000,
+      "patch": 6000,
+      "patchReasoning": 1200,
+      "testPlan": 2400,
+      "verification": 1200
+    },
+    "caseMaxPins": 6,
+    "coachMaxTurns": 6
+  },
+  "browserSourceHashes": {
+    "challenges.js": "788a7f991d7e0a72b21bd7cf61986c4555fe787aee6fbd1c5f5f65c6ca6417f8",
+    "interview-case.js": "91968b259942a7ee57bd02ae9a3202df1c64cbc09d77bb91ceacef66530de3e9",
+    "exercise.js": "ac2b24a74311a855bb73cc8ce02c547ad7db93af849fe4570f52de4916fc7815"
+  },
+  "versions": {
+    "drill:alias": "eaa8635e48a3fa0aff57827ed16c40686cef99d1fce9eaeb8b4162517dff2298",
+    "drill:finally": "718a73ef1a4c8b2dabf589bdd0e32326052c25b2de5a435cdc42e756c37538f0",
+    "drill:cache": "c6bf1f2b7a03d50e8924a54393c193251618912d0b0713e5564ca43095e5ac9d",
+    "drill:boundary": "22cf3487e61d0c1f6b8f1e8d58c768ef8e3cef02a0638be5fa119545bd594226",
+    "drill:patch": "e3f43a769f44d32a2c93e4219e8059bc76250bc8dced0fe48903f678769182e3",
+    "case:missing-requests-v1": "e41776f3019db5d4e06c93538522066904549bf82b5023df9a35dae9752ac6c3"
+  }
+}

@@ -1,0 +1,17 @@
+node_modules
+tests
+test-results
+playwright-report
+.git
+.impeccable
+.env
+.env.*
+*.pem
+*.key
+*.log
+*.hprof
+target
+.idea
+*.iml
+*.p12
+*.jks

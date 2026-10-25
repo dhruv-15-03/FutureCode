@@ -1,0 +1,184 @@
+<!doctype html>
+<!-- THESIS: A casebook for engineering judgment, not a SaaS pitch or a grid of feature cards.
+OWN-WORLD: Charcoal-black reading surfaces, soft ivory type, emerald controls, brick-red editorial framing, square code plates and shoulder notes.
+STORY: Browse a real problem, inspect source, sign in to submit, and distinguish a checked reference from ungraded reasoning.
+FIRST VIEWPORT: Contents in the left shoulder; a fluid problem ledger in the main column; provenance notes in the outside margin.
+FORM: User-selected Annotated casebook, lexicon shoulder-and-plate world; index-to-working-entry staging, seed 85014db0. -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#161210">
+  <meta name="description" content="FutureCode: Future of Coding Based Interviews. Read unfamiliar code, challenge AI proposals, and keep a record of your reasoning. Free beta.">
+  <title>FutureCode | Future of Coding Based Interviews</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body data-view="catalog">
+  <a class="skip" href="#catalog-title">Skip to practice</a>
+  <div class="application">
+    <header class="book-header">
+      <a class="brand" href="#catalog" aria-label="FutureCode home"><span class="brand-name">Future<span class="brand-accent">Code</span></span><span class="brand-tagline">Future of Coding Based Interviews</span></a>
+      <div class="guide-words" aria-label="Current workspace"><span id="guide-first">The problemset</span><span id="guide-last">Practice collection</span></div>
+      <button id="contents-toggle" class="quiet contents-toggle" aria-label="Navigation menu" aria-expanded="false" aria-controls="contents-rail" disabled><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false"><path d="M4 6h16M4 12h16M4 18h16" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
+      <div id="header-account-actions" class="header-actions" role="group" aria-label="Account actions"><span id="account-summary">Guest reader</span><button id="sign-in-action" class="secondary">Sign in with Google</button><button id="privacy-toggle" class="quiet" aria-expanded="false" aria-controls="privacy">Privacy & limits</button></div>
+    </header>
+    <aside id="contents-rail" class="contents-rail">
+      <nav class="contents-nav" aria-label="Contents">
+        <button id="catalog-mode" data-route="catalog" aria-pressed="true">The problemset</button>
+        <button id="interview-mode" data-route="interview" aria-pressed="false">Interview case</button>
+        <button id="curated-mode" data-route="library" aria-pressed="false">Snippet drills</button>
+        <button id="private-mode" data-route="private" aria-pressed="false">Your own snippet</button>
+        <button id="execution-mode" data-route="execution" aria-pressed="false">External tools</button>
+        <span class="contents-divider" aria-hidden="true"></span>
+        <button id="attempts-mode" data-route="attempts" aria-pressed="false">Saved work</button>
+        <button id="bookmarks-mode" data-route="bookmarks" aria-pressed="false">Saved entries</button>
+        <button id="progress-mode" data-route="progress" aria-pressed="false">Your progress</button>
+        <button id="leaderboard-mode" data-route="leaderboard" aria-pressed="false">Practice board</button>
+        <button id="contribute-mode" data-route="contribute" aria-pressed="false">Contributions</button>
+        <button id="review-mode" data-route="review" aria-pressed="false" hidden>Review desk</button>
+        <button id="account-mode" data-route="account" aria-pressed="false">Your account</button>
+      </nav>
+      <div id="mobile-account-actions" class="mobile-account-actions"></div>
+    </aside>
+    <main class="book-main">
+      <section id="privacy" class="privacy" hidden>
+        <h2>No candidate code runs on this server.</h2>
+        <p>Guests can browse; accounts are required for submissions, saved results, and contributions. Optional external execution is disabled unless the operator enables it, and requires separate consent to send code to the named sandbox provider. Private execution records store a source hash and bounded results, not provider-key fields or source text.</p>
+        <p>Optional AI sends only explicitly consented source or conversation to the selected OpenAI or Google Gemini endpoint. Provider billing and data policies apply. Student keys stay in tab memory and transient requests, never in MySQL or credential fields in exports. A four-digit PIN is not a safe encryption root. Do not include secrets or unauthorized code in drafts, answers, chat, or discussions.</p>
+        <p>Curated checks, author agreement, optional external test evidence, and unverified AI advice are different records. None is a hiring guarantee. Saved records are private; the practice board is opt-in and discussions are visible only to eligible signed-in readers and moderators. Optional support checkout is disabled until configured; returning from checkout does not prove payment.</p>
+        <p><a href="/privacy">Read the full privacy and data notice</a>.</p>
+      </section>
+      <p id="site-notice" class="setup-notice" role="status" hidden></p><button id="session-retry" class="text-button" hidden>Retry session connection</button>
+      <p id="platform-status" class="help-text" role="status" aria-live="polite"></p>
+      <div class="book-layout">
+      <div class="book-content">
+    <section id="catalog-view" aria-labelledby="catalog-title">
+      <div class="page-heading"><h1 id="catalog-title" tabindex="-1">The problemset</h1><p>A collection for reading code, tracing a failure, and questioning the first convincing answer.</p></div>
+      <form id="catalog-filters" class="catalog-filters" role="search">
+        <div><label for="catalog-search">Find an entry</label><input id="catalog-search" type="search" maxlength="100" placeholder="Concurrency, references, boundary tests…"></div>
+        <div><label for="catalog-difficulty">Difficulty</label><select id="catalog-difficulty"><option value="">All difficulties</option><option value="introductory">Introductory</option><option value="intermediate">Intermediate</option><option value="advanced">Advanced</option></select></div>
+        <button type="submit" class="secondary">Find</button>
+      </form>
+      <p id="catalog-count" class="help-text">Opening the collection…</p>
+      <div id="catalog-table" class="table-wrap catalog-table" aria-busy="true" data-initial-loading><table class="problem-ledger"><caption class="visually-hidden">Curated and approved community problems</caption><thead><tr><th scope="col">Entry</th><th scope="col">Reading task</th><th scope="col">Language</th><th scope="col">Difficulty</th><th scope="col">Time</th></tr></thead><tbody id="catalog-rows"></tbody></table></div>
+      <p id="catalog-empty" class="empty-state" hidden>No entries match these filters. Try a shorter search or a different difficulty.</p>
+      <p id="catalog-status" class="help-text" role="status"></p><button id="catalog-more" class="secondary" hidden>More community entries</button>
+    </section>
+    <section id="account-view" aria-labelledby="account-title" hidden><div class="page-heading"><h1 id="account-title" tabindex="-1">Your account</h1><p>A private record of practice, with a public name only where you contribute.</p></div><div id="account-content"></div></section>
+    <section id="attempts-view" aria-labelledby="attempts-title" hidden><div class="page-heading"><h1 id="attempts-title" tabindex="-1">Saved work</h1><p>Look back at the reasoning, not just the number beside it.</p></div><div id="attempts-content"></div></section>
+    <section id="bookmarks-view" aria-labelledby="bookmarks-title" hidden><div class="page-heading"><h1 id="bookmarks-title" tabindex="-1">Saved entries</h1><p>A private reading list, separate from your submitted practice.</p></div><div id="bookmarks-content"></div></section>
+    <section id="progress-view" aria-labelledby="progress-title" hidden><div class="page-heading"><h1 id="progress-title" tabindex="-1">Your progress</h1><p>Review retained practice by topic and reading task. A reference match is not a hiring assessment.</p></div><div id="progress-content"></div></section>
+    <section id="leaderboard-view" aria-labelledby="leaderboard-title" hidden><div class="page-heading"><h1 id="leaderboard-title" tabindex="-1">Practice board</h1><p>Opt-in activity from inspectable curated references. Not a candidate-quality ranking.</p></div><div id="leaderboard-content"></div></section>
+    <section id="execution-view" aria-labelledby="execution-title" hidden><div class="page-heading"><h1 id="execution-title" tabindex="-1">External tools</h1><p>Optional sandboxed execution and unverified patch advice. No candidate code runs on this application server.</p></div><div id="execution-content"></div></section>
+    <section id="contribute-view" aria-labelledby="contribute-title" hidden><div class="page-heading"><h1 id="contribute-title" tabindex="-1">Contributions</h1><p>A useful problem starts with source, a clear question, and a reference someone else can inspect.</p></div><div id="contribute-content"></div></section>
+    <section id="review-view" aria-labelledby="review-title" hidden><div class="page-heading"><h1 id="review-title" tabindex="-1">The review desk</h1><p>Read before publishing. Approval is a responsibility, not an execution result.</p></div><div id="review-content"></div></section>
+    <section id="problem-view" hidden><div id="problem-content" tabindex="-1"></div></section>
+    <section id="library" class="library-layout" hidden>
+      <aside class="challenge-rail" aria-label="Choose a challenge">
+        <h2>Java / Backend</h2><p class="rail-description">Five short entries.</p>
+        <div id="challenge-list"></div>
+        <p class="session-progress"><strong id="solved-count">0 / 5</strong> curated drills matched in saved records.</p>
+        <p class="rail-footer">Inspect the source and commit an answer to reveal the explanation.</p>
+      </aside>
+      <div id="workspace" class="workbench" tabindex="-1">
+        <header class="workbench-header"><div><div id="challenge-meta" class="metadata"></div><h1 id="challenge-title"></h1></div><span id="challenge-time" class="time"></span></header>
+        <div class="exercise-grid">
+          <section class="source-panel" aria-label="Source code"><div class="panel-bar"><span id="filename"></span><span>READ ONLY</span></div><pre id="source" tabindex="0" aria-label="Java source, scroll horizontally for long lines"></pre><p class="source-note">Read the whole snippet before choosing. Line highlights appear after feedback.</p></section>
+          <section class="reason-panel"><div class="question-top"><span id="question-count"></span><span class="reason-label">Reason it out</span></div><form id="answer-form"><fieldset id="answer-fieldset"><legend id="question-prompt"></legend><div id="answer-options"></div></fieldset><button id="check-answer" class="primary" type="submit" disabled>Check my reasoning <span aria-hidden="true">→</span></button></form><div id="feedback" role="status" aria-live="polite" hidden></div><button id="next-challenge" class="quiet next" hidden>Next challenge →</button></section>
+        </div>
+        <div id="drill-community"></div>
+      </div>
+    </section>
+    <section id="interview-workspace" class="interview-workspace" aria-labelledby="case-title" hidden>
+      <header class="case-header">
+        <div><h1 id="case-title" tabindex="-1">The missing requests</h1><p>Java 17+ · five source files · 20 to 30 minutes · authored practice, not an employer assessment</p></div>
+        <div class="case-actions"><button id="case-reset" class="quiet" hidden>Restart practice</button><button id="case-confirm-reset" class="quiet case-reset-confirm" hidden>Confirm restart: clear attempt & coach key</button></div>
+      </header>
+      <div id="case-brief" class="case-brief"></div>
+      <div id="case-active" hidden>
+        <ol id="case-steps" class="case-steps" aria-label="Interview practice stages"></ol>
+        <p id="case-elapsed" class="case-help"></p>
+        <details id="case-recap" class="case-recap"><summary>Revisit the incident brief & requirements</summary><div id="case-recap-content" class="case-brief"></div></details>
+        <div id="case-work-area" class="case-work-area">
+          <section id="case-file-pane" class="case-file-pane" aria-label="Explore the case source">
+            <div id="case-files" class="case-files" role="group" aria-label="Source file selection"></div>
+            <div class="panel-bar"><strong id="case-filename"></strong><span>READ ONLY</span></div>
+            <pre id="case-source" class="evidence-source case-source" tabindex="0" aria-label="Read-only Java source; checkboxes pin lines as evidence"></pre>
+            <p id="case-evidence-count" class="case-help" role="status"></p>
+            <div id="case-pins" class="case-pins" aria-label="Pinned evidence"></div>
+          </section>
+          <section class="case-task-panel" aria-labelledby="case-stage-title">
+            <h3 id="case-stage-title" tabindex="-1"></h3>
+            <div id="case-task"></div>
+          </section>
+        </div>
+        <p id="case-status" class="case-help" role="status" aria-live="polite"></p>
+        <div class="case-navigation"><button id="case-back" class="secondary">Previous stage</button><button id="case-hint" class="quiet">Show a nudge</button><button id="case-next" class="primary">Continue</button></div>
+        <div id="case-hints" class="case-hints" role="status" aria-live="polite"></div>
+        <details id="case-coach" class="case-coach">
+          <summary>Optional live AI collaborator · bring your own key</summary>
+          <p class="case-help">Use AI as an assistant, not a referee. Choose OpenAI or Google Gemini below. At most six total request attempts per practice, including failures and cancellations. Each send may incur provider charges. No automatic retries. Live integrations require separate verification.</p>
+          <div class="coach-grid">
+            <section class="coach-settings" aria-label="Coach key and consent">
+              <label for="coach-provider">Coach provider</label>
+              <select id="coach-provider"><option value="openai">OpenAI · gpt-4o-mini</option><option value="gemini">Google Gemini · Gemini 3.8 Flash</option></select>
+              <label for="coach-key">Provider key for this coach only</label>
+              <input id="coach-key" type="password" maxlength="256" autocomplete="off" spellcheck="false" placeholder="Memory only; never included in exports">
+              <div class="key-actions"><span>Cleared on leaving this mode or reloading.</span><button id="coach-forget" class="text-button">Forget coach key</button></div>
+              <label class="consent"><input id="coach-consent" type="checkbox"><span>I allow the five curated files, incident brief, seeded proposal, and my coach conversation to be sent through FutureCode to <span id="coach-provider-name">OpenAI</span>. I will not include secrets or unauthorized private code. My other written artifacts are not sent automatically.</span></label>
+              <p id="coach-request-count" class="case-help">0/6 request attempts used</p>
+            </section>
+            <section class="coach-conversation" aria-label="AI collaborator conversation">
+              <div id="coach-transcript" class="coach-transcript" role="log" aria-live="polite" aria-relevant="additions"></div>
+              <form id="coach-form" novalidate>
+                <label for="coach-prompt">Ask about the case or challenge a proposal</label>
+                <textarea id="coach-prompt" maxlength="2000" autocomplete="off" placeholder="What assumption should I verify? Does this proposed change really preserve every increment?"></textarea>
+                <button id="coach-send" class="primary" type="submit">Send to AI coach</button>
+                <button id="coach-cancel" class="quiet" type="button" hidden>Cancel coach request</button>
+              </form>
+              <p id="coach-status" class="case-help" role="status" aria-live="polite"></p>
+            </section>
+          </div>
+        </details>
+      </div>
+    </section>
+    <div id="case-community"></div>
+    <section id="private-workspace" class="private-workspace" tabindex="-1" hidden>
+      <div class="private-heading"><div><h1>Your private snippet</h1><p>Predict, cite the source, and challenge the explanation. Nothing here is automatically saved to your account or proposed for publication.</p></div><button id="clear-private" class="quiet">Clear snippet & key</button></div>
+      <p id="private-account-note" class="account-note">This is a viewing copy. <a href="#account">Sign in</a> to use the private workspace and optional AI.</p>
+      <div class="private-grid">
+        <section class="snippet-input"><div class="input-heading"><label for="snippet">Source snippet</label><label class="upload" for="source-file">Upload text file<input id="source-file" type="file" accept=".txt,.java,.js,.ts,.py,.go,.rs,.c,.cpp,.cs,.json,.sql,.kt,.rb,.html,.css"></label></div><textarea id="snippet" maxlength="12000" autocomplete="off" spellcheck="false" placeholder="Paste code here. No automatic execution or provider request."></textarea><div class="input-help"><span>UTF-8 text · max 12 KB file / 12,000 characters / 400 lines</span><span id="char-count">0 / 12,000</span></div><p id="upload-error" class="error" role="alert" hidden></p><button id="worksheet-button" class="secondary">Create local reading worksheet</button></section>
+        <section class="ai-settings">
+          <h3>Optional AI practice writer</h3><p>Trace behavior, challenge an assumption, choose a test. One generation request; your provider charges apply.</p>
+          <label for="ai-provider">AI provider</label><select id="ai-provider"><option value="openai">OpenAI · gpt-4o-mini</option><option value="gemini">Google Gemini · Gemini 3.8 Flash</option></select>
+          <label for="api-key">Your selected provider's API key</label><input id="api-key" type="password" autocomplete="off" spellcheck="false" placeholder="Paste a key for this mode only" maxlength="256">
+          <div class="key-actions"><span>Memory only. Cleared on leaving this mode.</span><button id="forget-key" class="text-button">Forget key</button></div>
+          <label class="consent"><input id="provider-consent" type="checkbox"><span>I allow this snippet to be sent through FutureCode to <span id="private-provider-name">OpenAI</span> for question generation. I have permission to share it and have removed secrets. Source or provider changes reset this consent.</span></label>
+          <button id="generate-button" class="primary">Generate evidence rounds <span aria-hidden="true">↗</span></button><p class="ai-caveat">Citation locations are checked; AI reasoning is not. Answers, notes, and flags stay in this tab and are not sent for grading. Live provider integrations require separate verification.</p><p id="ai-status" role="status" aria-live="polite"></p>
+        </section>
+      </div>
+      <section id="worksheet" class="worksheet" hidden><h3>Your reading worksheet</h3><p>Local reflection only. These generic prompts are not code analysis and are not automatically graded.</p><div class="reflection-grid"><label>What enters, and what changes?<textarea id="reflection-input" placeholder="Inputs, outputs, mutations, and side effects…"></textarea></label><label>Where could the behavior surprise you?<textarea id="reflection-risk" placeholder="Boundaries, error paths, concurrency, or missing context…"></textarea></label><label>Which test would prove your understanding?<textarea id="reflection-test" placeholder="A concrete input and its expected result…"></textarea></label></div></section>
+      <section id="ai-result" class="ai-result" hidden><h3 id="ai-title" tabindex="-1"></h3><p>AI-generated reference, not a verified oracle. Exact quotes are checked against your source snapshot, but that does not prove an answer or explanation is correct.</p><div id="ai-exercise-host"></div></section>
+    </section>
+      </div>
+      <aside class="annotation-margin" aria-label="Reading notes">
+        <h2>On references</h2>
+        <p>A convincing answer is a place to begin checking, not a reason to stop.</p>
+        <dl><dt>Curated</dt><dd>A reference supplied with the exercise. Its checks are narrow, not a hiring assessment.</dd><dt>Community</dt><dd>Reviewed before publication. Author agreement is not automatic proof of correctness.</dd><dt>AI</dt><dd>Optional, consented assistance. Quotes can be located exactly while reasoning remains wrong.</dd></dl>
+        <p class="margin-rule">Browsing is public. Submissions and saved records belong to a signed-in account.</p>
+      </aside>
+      </div>
+    </main>
+    <footer class="site-footer">
+      <div class="footer-top">
+        <div><a class="footer-brand" href="/#catalog">Future<span class="brand-accent">Code</span></a><p class="footer-tagline">Future of Coding Based Interviews</p></div>
+        <nav class="footer-links" aria-label="Footer"><a href="/#catalog">Problemset</a><a href="/#interview">Interview case</a><a href="/#account">Your account</a><a href="/privacy">Privacy & data</a></nav>
+      </div>
+      <div class="footer-bottom"><span>Free beta. AI charges are yours.</span><span>No code runs on this server.</span></div>
+    </footer>
+  </div>
+</body>
+</html>

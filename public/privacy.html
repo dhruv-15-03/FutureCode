@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#161210">
+  <title>Privacy & data | FutureCode</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+  <script type="module" src="/shell.js"></script>
+</head>
+<body>
+  <a class="skip" href="#privacy-title">Skip to privacy notice</a>
+  <div class="document-shell">
+  <header class="book-header">
+    <a class="brand" href="/#catalog" aria-label="FutureCode home"><span class="brand-name">Future<span class="brand-accent">Code</span></span><span class="brand-tagline">Future of Coding Based Interviews</span></a>
+    <div class="guide-words" aria-label="Current page"><span>Privacy & data</span><span>How this application handles your information</span></div>
+    <button id="contents-toggle" class="quiet contents-toggle" aria-label="Navigation menu" aria-expanded="false" aria-controls="contents-rail" disabled><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false"><path d="M4 6h16M4 12h16M4 18h16" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
+    <nav id="header-account-actions" class="header-actions" aria-label="Practice"><a class="secondary" href="/#catalog">Back to practice</a><a class="quiet" href="/#account">Your account</a></nav>
+  </header>
+  <aside id="contents-rail" class="contents-rail document-navigation">
+    <nav class="contents-nav" aria-label="Contents"><a href="/#catalog">The problemset</a><a href="/#interview">Interview case</a><a href="/privacy" aria-current="page">Privacy & data</a></nav>
+    <div id="mobile-account-actions" class="mobile-account-actions"></div>
+  </aside>
+  <main class="policy-document">
+    <h1 id="privacy-title" tabindex="-1">Privacy & data</h1>
+    <p>This notice describes the application's implemented data flows. The organization operating your FutureCode installation is responsible for its hosting, database, backups, contact details, and applicable privacy obligations. Ask that operator before submitting information you cannot authorize it to hold.</p>
+    <h2>Public reading, signed-in submissions</h2>
+    <p>Guests can browse published problems and their source. Google sign-in is required to submit attempts, keep reference results, or contribute content. FutureCode requests only basic identity scopes: OpenID, email, and profile. It uses Google's verified account subject to identify the account. It does not receive your Google password or request access to Gmail or Drive.</p>
+    <p>The configured MySQL database stores the Google subject, verified email, optional Google name, chosen public display name, application role, and submitted account records. Email and the Google subject are not shown in the public problemset. Your display name accompanies approved contributions and discussion posts. The public practice board is off by default and shows only opted-in names and retained curated-reference totals.</p>
+    <h2>What is stored</h2>
+    <p>Saving a draft stores its source, question, and proposed reference solution privately. Submitting it for review makes it available to moderators. Only approved problems become public. Moderator approval is not an execution result or independent proof of copyright ownership.</p>
+    <p>Submitting a practice attempt stores its bounded response, relevant source pins or selections, reference version, and applicable reference checks. Case submissions include the written reasoning, proposed patch, and test plan. Student credentials and coach conversations are excluded from saved attempts. Bookmarks, votes and discussion posts are stored when explicitly submitted; discussions are gated to eligible signed-in readers and moderators.</p>
+    <h2>Optional external execution</h2>
+    <p>No candidate code is compiled or executed on this application host. If the operator enables the external runner, execution requires separate explicit consent and a scoped RapidAPI key. The selected program, input and applicable trusted regression harness are sent to Judge0 CE on RapidAPI. The provider's runtime limits, sandboxing, billing and retention apply; this application does not certify the provider's isolation or secure erasure. The available legacy runtime versions differ from the Java 17 case.</p>
+    <p>Private run records store a source hash, runtime, provider job token and bounded outputs, not source text or the key field. Output can still contain sensitive text your program prints. A timed regression harness is limited evidence, not exhaustive semantic proof or an anti-cheat assessment. Cancelling a browser request or deleting a local record does not cancel remote work or erase provider-retained data.</p>
+    <h2>Optional AI</h2>
+    <p>AI use requires a separately entered provider key and explicit consent. The local/server proxy sees that key while sending the authorized request to the selected provider's fixed endpoint. Keys are held only in the password field and transient request memory, not in MySQL, application cookies, account exports, or application request logs. This is not a zero-knowledge design or a secure-memory-erasure guarantee.</p>
+    <p>OpenAI and Google Gemini use fixed endpoints selected by you. Private-snippet generation sends the consented snippet and instructions. Interview coaching sends the five curated files, case context, seeded proposal, and explicit conversation. Separate patch advice sends the case, your proposed counter patch/reasoning and any selected owned execution evidence. Other written answers and patches are not included automatically; anything you paste into a prompt is included. Provider billing, retention, and data policies apply. A cancelled browser request cannot recall data or undo charges already incurred.</p>
+    <h2>Optional support payments</h2>
+    <p>Practice remains free. If the operator explicitly configures support payments, checkout is hosted by Razorpay on its own site; no payment script is installed in this workspace and card details are not stored here. Payment-link identifiers, server-assigned amount/currency, status and provider event identifiers are retained for accounting and replay protection. Returning from checkout is not proof of payment: status changes require a verified matching provider webhook. Provider fees and policies apply.</p>
+    <h2>Cookies and operational data</h2>
+    <p>Necessary HttpOnly application cookies support sign-in. An OAuth flow cookie lasts up to ten minutes; application sessions last up to seven days, with at most five retained sessions per account. Session tokens are hashed in MySQL. Production cookies use Secure and SameSite protections; account-authenticated writes check their origin and CSRF token. Payment webhooks instead require a matching cryptographic signature over the original request body.</p>
+    <p>The application does not install analytics, advertising, or cross-site tracking scripts. Bounded in-memory request counters help control abuse. It does not log request bodies, source, credentials, or raw provider errors. Hosting providers, reverse proxies, databases, and identity/AI providers can have their own operational logging and backup policies.</p>
+    <h2>Retention, downloads, and deletion</h2>
+    <p>There is no automatic browser persistence of private snippets or local practice drafts. Reload, sign-out, or an explicit clear can remove local work. A download happens only when you choose it and may include sensitive text you wrote. Credential fields are excluded, but the application does not automatically detect secrets pasted into answers, source, or chat.</p>
+    <p>Account records remain in the configured database until deleted or managed by the operator's disclosed retention and backup policy. You can delete individual attempts, eligible contributions, your discussion posts and execution records. Account deletion requires a recent sign-in and explicit confirmation; it removes the account, sessions, attempts, bookmarks, votes, discussions, runs and owned contributions, including published problems. Moderation events retain bounded metadata without source or credential fields; deleted actors are de-identified. Payment records retain accounting metadata with the user link removed. The operator must disclose retention/backup obligations and provide its real contact details. Deletion cannot recall external copies, downloads or provider data.</p>
+    <h2>References are not a hiring assessment</h2>
+    <p>Curated checks, community-author agreement, ungraded written work, and AI suggestions are labeled separately. Real source quotes can still support wrong reasoning. No score certifies interview readiness or guarantees employment.</p>
+    <h2>Safe participation</h2>
+    <p>Do not submit passwords, API keys, personal data you lack permission to share, proprietary repositories, or copyrighted content you cannot publish. Source is text unless you explicitly request a separately enabled external run. FutureCode does not execute user code or install its dependencies on this server. Contact your beta administrator for data questions or a publication dispute.</p>
+  </main>
+  <footer class="site-footer">
+    <div class="footer-top">
+      <div><a class="footer-brand" href="/#catalog">Future<span class="brand-accent">Code</span></a><p class="footer-tagline">Future of Coding Based Interviews</p></div>
+      <nav class="footer-links" aria-label="Footer"><a href="/#catalog">Problemset</a><a href="/#interview">Interview case</a><a href="/#account">Your account</a><a href="/privacy" aria-current="page">Privacy & data</a></nav>
+    </div>
+    <div class="footer-bottom"><span>Free beta. AI charges are yours.</span><span>No code runs on this server.</span></div>
+  </footer>
+  </div>
+</body>
+</html>

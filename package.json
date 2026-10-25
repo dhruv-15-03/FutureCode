@@ -1,0 +1,15 @@
+{
+  "name": "futurecode-dev-tools",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "FutureCode - Future of Coding Based Interviews",
+  "scripts": {
+    "test": "node --test tests/content.test.mjs tests/interview.test.mjs tests/java-case.test.mjs",
+    "test:browser": "playwright test",
+    "check": "node scripts/check.mjs",
+    "content:export": "node scripts/export-content.mjs"
+  },
+  "devDependencies": { "@playwright/test": "^1.56.1" },
+  "engines": { "node": ">=22" }
+}

@@ -1,0 +1,16 @@
+node_modules/
+test-results/
+playwright-report/
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.jks
+*.log
+*.hprof
+.impeccable/hook.cache.json
+target/
+.idea/
+*.iml

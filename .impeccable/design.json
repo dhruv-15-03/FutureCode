@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-25T09:48:34.134Z",
+  "title": "Design System: FutureCode",
+  "extensions": {
+    "colorMeta": {
+      "canvas": { "role": "neutral", "displayName": "Warm near-black casebook" },
+      "ink": { "role": "neutral", "displayName": "Soft ivory reading text" },
+      "emerald": { "role": "primary", "displayName": "Deep emerald action" },
+      "emerald-text": { "role": "primary", "displayName": "Readable emerald focus and selection" },
+      "signature-red": { "role": "accent", "displayName": "Oxide-red signature" },
+      "editorial-ink": { "role": "accent", "displayName": "Readable red branding and source framing" },
+      "code-plate": { "role": "neutral", "displayName": "Bounded dark code plate" }
+    },
+    "typographyMeta": {
+      "headline": { "displayName": "Reading heading", "purpose": "Compact entry and page hierarchy, not marketing display." },
+      "body": { "displayName": "Casebook reading", "purpose": "Statements, reasoning, labels and documentation." },
+      "code": { "displayName": "Actual source", "purpose": "Only source and structured records." }
+    },
+    "shadows": [],
+    "motion": [],
+    "breakpoints": [
+      { "name": "task-margin-reclaimed", "value": "1680px" },
+      { "name": "outside-notes-hidden", "value": "1280px" },
+      { "name": "stacked-workspace", "value": "1100px" },
+      { "name": "mobile-contents", "value": "760px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary action",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "One explicit action on source, submission or state.",
+      "html": "<button class=\"ds-primary\">Submit and save</button>",
+      "css": ".ds-primary{font:14px/1.5 Georgia,serif;background:var(--accent,#285f46);color:var(--ink,#f0e5d3);border:1px solid var(--accent-line,#5e9770);border-radius:2px;padding:10px 17px;min-height:44px;cursor:pointer}.ds-primary:hover{background:var(--accent-hover,#2e7052)}.ds-primary:focus-visible{outline:2px solid var(--accent-text,#9dc8ad);outline-offset:4px}.ds-primary:disabled{color:var(--disabled,#b1a18f);background:var(--raised,#2c241e);border-color:var(--line,#47382e);cursor:not-allowed}"
+    },
+    {
+      "name": "Secondary action",
+      "kind": "button",
+      "description": "A quiet visible-stroke action.",
+      "html": "<button class=\"ds-secondary\">Save private draft</button>",
+      "css": ".ds-secondary{font:14px/1.5 Georgia,serif;background:var(--plate,#211b17);color:var(--ink,#f0e5d3);border:1px solid var(--control-line,#8e7863);border-radius:2px;padding:10px 17px;min-height:44px;cursor:pointer}.ds-secondary:hover{background:var(--raised,#2c241e)}.ds-secondary:focus-visible{outline:2px solid var(--accent-text,#9dc8ad);outline-offset:4px}"
+    },
+    {
+      "name": "Outlined field",
+      "kind": "input",
+      "refersTo": "input-field",
+      "description": "Native input with a visible boundary and useful label.",
+      "html": "<label class=\"ds-label\" for=\"ds-entry\">Find an entry</label><input id=\"ds-entry\" class=\"ds-input\" placeholder=\"Concurrency, references, boundary tests…\">",
+      "css": ".ds-label{display:block;font:14px/1.6 Georgia,serif;color:var(--ink,#f0e5d3);margin-bottom:8px}.ds-input{box-sizing:border-box;width:100%;font:14px/1.6 Georgia,serif;border:1px solid var(--control-line,#8e7863);border-radius:3px;padding:10px 12px;background:var(--plate,#211b17);color:var(--ink,#f0e5d3);min-height:44px}.ds-input:focus-visible{outline:2px solid var(--accent-text,#9dc8ad);outline-offset:4px}.ds-input::placeholder{color:var(--muted,#b8aa9a)}"
+    },
+    {
+      "name": "Contents entry",
+      "kind": "nav",
+      "description": "A printed reading destination, current through weight and underline.",
+      "html": "<nav class=\"ds-contents\"><button aria-pressed=\"true\">The problemset</button><button>Interview case</button><button>Saved work</button></nav>",
+      "css": ".ds-contents{display:flex;flex-direction:column;gap:4px}.ds-contents button{font:15px/1.5 Georgia,serif;padding:10px 0;min-height:44px;text-align:left;background:none;border:0;color:var(--ink,#f0e5d3);cursor:pointer}.ds-contents button[aria-pressed=true]{color:var(--accent-text,#9dc8ad);font-weight:700;text-decoration:underline;text-underline-offset:6px}.ds-contents button:hover{text-decoration:underline}.ds-contents button:focus-visible{outline:2px solid var(--accent-text,#9dc8ad);outline-offset:4px}"
+    },
+    {
+      "name": "Source evidence",
+      "kind": "custom",
+      "description": "A real source line with a native evidence pin.",
+      "html": "<label class=\"ds-source\"><input type=\"checkbox\" checked><span>16</span><code>int previous = counts.getOrDefault(route, 0);</code></label>",
+      "css": ".ds-source{display:flex;align-items:baseline;gap:13px;padding:8px;background:var(--soft,#203a2b);color:var(--source-ink,#d9e0d0);border:1px solid var(--accent-line,#5e9770);overflow:auto;font:12px/1.9 Consolas,monospace;cursor:pointer}.ds-source input{accent-color:var(--accent-text,#9dc8ad);flex-shrink:0}.ds-source span{font-size:10px;color:var(--line-number,#adb1a2)}.ds-source code{white-space:pre;font:inherit}.ds-source:focus-within{outline:2px solid var(--accent-text,#9dc8ad);outline-offset:4px}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Annotated casebook",
+    "overview": "The user selected a technical casebook rather than a conventional SaaS world. Reading is the primary activity: an entry, its source, a written response, and the provenance of the reference should remain distinct. The interface uses a contents shoulder and outside annotations, not a marketing hero or dashboard illustration.",
+    "keyCharacteristics": ["Shared masthead and bottom footer", "Fluid reading ledger", "Contents shoulder", "Outside provenance notes", "Bounded source plates", "Explicit publication and verification states"],
+    "rules": [
+      { "name": "The plate rule", "body": "Source, evidence, inputs, selected controls, and notices have bounded surfaces. Do not spread decorative color behind unrelated sections or add gradients, glows, glass, or background grids.", "section": "colors" }
+    ],
+    "dos": [
+      "Do preserve the distinction between curated checks, community-author agreement, AI suggestions, and ungraded writing.",
+      "Do use real entry content, visible source, and honest empty/error states as the interface's proof.",
+      "Do keep source and response adjacent on wide screens and in a coherent reading order on phones."
+    ],
+    "donts": [
+      "Don't add bento feature grids, infinite feature trios, floating dashboard mockups, pricing-card theatre, logo clouds, stock personas, marquees, cursor trails, or decorative icons.",
+      "Don't use indigo/purple gradients, sparkle marks, glassmorphism, glowing borders, enormous shadows, or gradient headlines.",
+      "Don't turn a reference match into a hiring-readiness badge or use color as a substitute for a publication/verification label."
+    ]
+  }
+}
