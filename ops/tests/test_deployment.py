@@ -96,6 +96,20 @@ class DeploymentTest(unittest.TestCase):
         fixture.publish_check("readiness-check")
         self.assertTrue(fixture.calls[-1][1].endswith("futurecode-cost-events:publish"))
 
+    def test_app_startup_probe_waits_for_full_readiness_and_preserves_the_strict_host_boundary(self):
+        fixture = DeploymentFixture()
+        fixture.app_identity = "futurecode-app@" + fixture.project + ".iam.gserviceaccount.com"
+        origin = "https://futurecode-fixture-uc.a.run.app"
+        document = fixture.app_service_document("synthetic-image", fixture.app_identity,
+            {"APP_ORIGIN": origin}, {"/secrets/config/futurecode.properties": ("futurecode-config", "1")})
+        container = document["spec"]["template"]["spec"]["containers"][0]
+        self.assertEqual(container["startupProbe"]["httpGet"], {
+            "path": "/readyz", "port": 8080,
+            "httpHeaders": [{"name": "Host", "value": "futurecode-fixture-uc.a.run.app"}]
+        })
+        self.assertLessEqual(container["startupProbe"]["periodSeconds"] * container["startupProbe"]["failureThreshold"], 240)
+        self.assertEqual(container["resources"]["limits"], {"cpu": "1", "memory": "512Mi"})
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -3,6 +3,8 @@ package io.futurecode;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.boot.availability.ApplicationAvailability;
+import org.springframework.boot.availability.ReadinessState;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -25,8 +27,9 @@ public final class PublicController {
     private final AppSettings settings;
     private final Authentication auth;
     private final Store store;
-    public PublicController(AppSettings settings, Authentication auth, ObjectProvider<Store> store) throws IOException {
-        this.settings = settings; this.auth = auth; this.store = store.getIfAvailable();
+    private final ApplicationAvailability availability;
+    public PublicController(AppSettings settings, Authentication auth, ObjectProvider<Store> store, ApplicationAvailability availability) throws IOException {
+        this.settings = settings; this.auth = auth; this.store = store.getIfAvailable(); this.availability = availability;
         Map<String, String> files = Map.ofEntries(Map.entry("/", "index.html"), Map.entry("/privacy", "privacy.html"),
             Map.entry("/app.js", "app.js"), Map.entry("/challenges.js", "challenges.js"), Map.entry("/exercise.js", "exercise.js"),
             Map.entry("/interview-case.js", "interview-case.js"), Map.entry("/interview.js", "interview.js"),
@@ -87,6 +90,7 @@ public final class PublicController {
         return ResponseEntity.status(303).header("Location", settings.origin() + "/#account?payment=return").build();
     }
     @GetMapping("/readyz") public ObjectNode ready() {
+        if (availability.getReadinessState() != ReadinessState.ACCEPTING_TRAFFIC) throw new ApiError(503, "Application startup or shutdown is in progress.", "not_ready");
         if (store == null || !auth.available()) throw new ApiError(503, "MySQL and Google OAuth setup are required for submissions.", "setup_required");
         store.ping(); return Json.obj("status", "ready");
     }

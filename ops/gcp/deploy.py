@@ -11,6 +11,7 @@ import tempfile
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlparse
 
 import requests
 
@@ -385,6 +386,13 @@ class Deployment:
         raise DeployError("image_build_timeout")
 
     def service_deploy(self, name, image, identity, variables, *, secrets=None):
+        if name == self.service:
+            document = self.app_service_document(image, identity, variables, secrets)
+            with tempfile.TemporaryDirectory(prefix="futurecode-service-") as directory:
+                file = Path(directory) / "service.json"
+                file.write_text(json.dumps(document), "utf-8")
+                self.gcloud("run", "services", "replace", str(file), "--region=" + self.region, timeout=600)
+            return self.service_url(name)
         arguments = [
             "run", "deploy", name, "--image=" + image, "--region=" + self.region,
             "--service-account=" + identity, "--cpu=1", "--memory=512Mi", "--min=0", "--max=1",
@@ -397,6 +405,48 @@ class Deployment:
             arguments.append("--set-secrets=" + ",".join(path + "=" + name + ":" + version
                                                         for path, (name, version) in secrets.items()))
         self.gcloud(*arguments, timeout=600)
+        return self.service_url(name)
+
+    def app_service_document(self, image, identity, variables, secrets):
+        origin = variables.get("APP_ORIGIN", "")
+        if not re.fullmatch(r"https://[a-z0-9.-]+\.run\.app", origin):
+            raise DeployError("invalid_app_probe_origin")
+        if identity != self.app_identity or not secrets:
+            raise DeployError("invalid_app_service_identity")
+        mounts, volumes = [], []
+        for path, (name, version) in secrets.items():
+            directory, filename = path.rsplit("/", 1)
+            mounts.append({"name": name, "mountPath": directory})
+            volumes.append({"name": name, "secret": {"secretName": name, "items": [{"key": version, "path": filename}]}})
+        return {
+            "apiVersion": "serving.knative.dev/v1", "kind": "Service",
+            "metadata": {"name": self.service, "namespace": self.project, "labels": LABELS,
+                         "annotations": {"run.googleapis.com/maxScale": "1", "run.googleapis.com/ingress": "all"}},
+            "spec": {
+                "template": {
+                    "metadata": {"annotations": {
+                        "run.googleapis.com/cpu-throttling": "true", "run.googleapis.com/startup-cpu-boost": "false"
+                    }},
+                    "spec": {
+                        "serviceAccountName": identity, "containerConcurrency": 16, "timeoutSeconds": 60,
+                        "volumes": volumes, "containers": [{
+                            "image": image, "ports": [{"containerPort": 8080}],
+                            "env": [{"name": key, "value": value} for key, value in variables.items()],
+                            "resources": {"limits": {"cpu": "1", "memory": "512Mi"}},
+                            "volumeMounts": mounts,
+                            "startupProbe": {
+                                "httpGet": {"path": "/readyz", "port": 8080,
+                                            "httpHeaders": [{"name": "Host", "value": urlparse(origin).netloc}]},
+                                "periodSeconds": 5, "timeoutSeconds": 5, "failureThreshold": 48
+                            }
+                        }]
+                    }
+                },
+                "traffic": [{"latestRevision": True, "percent": 100}]
+            }
+        }
+
+    def service_url(self, name):
         service = self.gcloud("run", "services", "describe", name, "--region=" + self.region)
         if not any(condition.get("type") == "Ready" and condition.get("status") == "True"
                    for condition in service.get("status", {}).get("conditions", [])):
@@ -494,7 +544,7 @@ class Deployment:
         return result["name"].split("/")[-1]
 
     def application(self, private_config, ca_file):
-        if not self.state.get("guardUrl") or not self.state.get("budget"):
+        if not self.state.get("guardUrl") or not self.state.get("budget") or not self.state.get("protectionVerified"):
             raise DeployError("cost_protection_required_before_app")
         image = self.source_image("app")
         config_name = "futurecode-config"
@@ -523,7 +573,7 @@ class Deployment:
                         "--member=serviceAccount:" + self.app_identity, "--role=roles/secretmanager.secretAccessor")
         variables = {
             "APP_ENV": "production", "HOST": "0.0.0.0",
-            "APP_ORIGIN": f"https://{self.service}-{self.project_number}.{self.region}.run.app",
+            "APP_ORIGIN": self.state.get("appUrl") or f"https://{self.service}-{self.project_number}.{self.region}.run.app",
             "DATABASE_SCHEMA": "FutureTool", "MYSQL_TLS": "required",
             "MYSQL_CA_FILE": "/secrets/mysql/mysql-ca.pem", "MYSQL_CONNECTION_LIMIT": "4",
             "SPRING_CONFIG_ADDITIONAL_LOCATION": "file:/secrets/config/futurecode.properties",
@@ -535,8 +585,11 @@ class Deployment:
             "/secrets/mysql/mysql-ca.pem": (ca_name, ca_version)
         })
         if url != variables["APP_ORIGIN"]:
-            self.gcloud("run", "services", "update", self.service, "--region=" + self.region,
-                        "--update-env-vars=APP_ORIGIN=" + url, timeout=600)
+            variables["APP_ORIGIN"] = url
+            self.service_deploy(self.service, image, self.app_identity, variables, secrets={
+                "/secrets/config/futurecode.properties": (config_name, config_version),
+                "/secrets/mysql/mysql-ca.pem": (ca_name, ca_version)
+            })
         self.state["appUrl"] = url
         self.save()
         self.gcloud("run", "services", "add-iam-policy-binding", self.service,
@@ -566,6 +619,11 @@ class Deployment:
             push.get("oidcToken", {}).get("serviceAccountEmail") != self.push_identity or
             push.get("oidcToken", {}).get("audience") != self.state["guardUrl"]):
             raise DeployError("authenticated_guard_delivery_not_configured")
+        topic_policy = self.gcloud("pubsub", "topics", "get-iam-policy", self.topic)
+        if not any(row.get("role") == "roles/pubsub.publisher" and
+                   "serviceAccount:billing-budget-alert@system.gserviceaccount.com" in row.get("members", [])
+                   for row in topic_policy.get("bindings", [])):
+            raise DeployError("google_budget_publisher_not_authorized")
         service = self.gcloud("run", "services", "describe", self.guard_service, "--region=" + self.region)
         self.verify_service_profile(service, self.guard_identity)
         policy = self.gcloud("run", "services", "get-iam-policy", self.guard_service, "--region=" + self.region)
@@ -636,6 +694,10 @@ class Deployment:
             raise DeployError("production_origin_readback_failed")
         if environment.get("EXECUTION_ENABLED") != "false" or environment.get("PAYMENTS_ENABLED") != "false":
             raise DeployError("unapproved_external_integrations_enabled")
+        probe = container.get("startupProbe", {})
+        if (probe.get("httpGet", {}).get("path") != "/readyz" or
+            probe.get("httpGet", {}).get("httpHeaders") != [{"name": "Host", "value": urlparse(url).netloc}]):
+            raise DeployError("application_readiness_startup_probe_missing")
         for route in ("/readyz", "/", "/privacy", "/api/catalog"):
             response = self.session.get(url + route, timeout=(10, 60), allow_redirects=False)
             if response.status_code != 200:
