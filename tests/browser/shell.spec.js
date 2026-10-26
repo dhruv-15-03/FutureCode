@@ -99,3 +99,19 @@ test('the compact header and contents remain usable on a narrow screen', async (
   await expect(page.locator('#snippet')).toBeVisible();
   await assertPageFrame(page);
 });
+
+for (const width of [768, 1440]) {
+  test(`the masthead keeps its default height with the narrower serif fallback at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('/');
+    await expect(page.locator('#sign-in-action')).not.toBeDisabled();
+    await page.evaluate(() => { document.documentElement.style.fontFamily = '"Times New Roman", serif'; });
+    const geometry = await page.locator('.book-header').evaluate(header => {
+      const tagline = header.querySelector('.brand-tagline');
+      return { header: header.getBoundingClientRect().height, tagline: tagline.getBoundingClientRect().height,
+        lineHeight: parseFloat(getComputedStyle(tagline).lineHeight) };
+    });
+    expect(geometry.tagline).toBeLessThanOrEqual(geometry.lineHeight + 1);
+    expect(geometry.header).toBeCloseTo(80, 0);
+  });
+}

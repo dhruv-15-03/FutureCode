@@ -64,7 +64,7 @@ h4 { font-size: 17px; line-height: 1.4; margin: 24px 0 12px; }
 .brand { display: block; text-decoration: none; font-size: 28px; font-weight: 700; letter-spacing: -.035em; line-height: 1.2; }
 .brand-name { white-space: nowrap; }
 .brand-accent { color: var(--editorial-ink); }
-.brand-tagline { display: block; max-width: 25ch; font-weight: 400; letter-spacing: 0; font-size: 11px; line-height: 1.65; margin-top: 6px; color: var(--muted); }
+.brand-tagline { display: block; max-width: 100%; font-weight: 400; letter-spacing: 0; font-size: 11px; line-height: 1.65; margin-top: 6px; color: var(--muted); }
 .contents-nav { display: flex; flex-direction: column; gap: 4px; }
 .contents-nav button, .contents-nav>a { display: block; padding: 10px 0; background: none; text-align: left; font-size: 15px; line-height: 1.5; min-height: 44px; }
 .contents-nav button:hover { text-decoration: underline; text-underline-offset: 5px; }

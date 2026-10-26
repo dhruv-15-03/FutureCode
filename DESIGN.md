@@ -97,6 +97,8 @@ Research basis: [Radix's 12-step usage guidance](https://www.radix-ui.com/colors
 
 Georgia with Times New Roman fallback supplies the reading voice without a webfont request. Headings use a compact 30/23/19/17px hierarchy; the mobile primary heading is 27px. Labels, metadata, and marginal notes are deliberately smaller and should not replace full instructions where meaning is essential.
 
+The masthead tagline uses its available brand-column width, not a `ch` limit. Narrower fallback-font zero glyphs must not force an extra line and enlarge the default desktop header. Enlarged user text can still grow naturally.
+
 Consolas/Cascadia Code is reserved for actual source and structured records. Google sign-in retains a plain Arial identity-control treatment. Do not use small tracked mono labels as a technical costume.
 
 Body prose generally stays within 65-76 characters where possible. Large task forms and source workspaces can use the available width; do not force the entire application into a 1440px wrapper.
