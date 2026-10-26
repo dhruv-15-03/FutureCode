@@ -36,6 +36,11 @@ class ReleaseGateTest(unittest.TestCase):
     def test_source_publication_keeps_cloud_writes_disabled(self):
         self.assertIs(json.loads((ROOT / "ops" / "gcp" / "project.json").read_text("utf-8"))["cloud_changes_enabled"], False)
 
+    def test_deployment_does_not_silently_activate_registry_deletion(self):
+        text = (ROOT / "ops" / "gcp" / "deploy.py").read_text("utf-8")
+        self.assertIn('"--dry-run"', text)
+        self.assertNotIn('"--no-dry-run"', text)
+
 
 if __name__ == "__main__":
     unittest.main()

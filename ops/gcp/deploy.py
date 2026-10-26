@@ -391,7 +391,7 @@ class Deployment:
                     "--role=roles/artifactregistry.writer")
         self.gcloud("artifacts", "repositories", "set-cleanup-policies", self.repository,
                     "--location=" + self.region,
-                    "--policy=" + str(ROOT / "ops" / "gcp" / "artifact-cleanup.json"), "--no-dry-run")
+                    "--policy=" + str(ROOT / "ops" / "gcp" / "artifact-cleanup.json"), "--dry-run")
         topic = self.api("GET", "https://pubsub.googleapis.com/v1/" + self.topic, allow_missing=True)
         if topic is None:
             self.api("PUT", "https://pubsub.googleapis.com/v1/" + self.topic,

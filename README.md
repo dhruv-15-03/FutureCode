@@ -316,6 +316,8 @@ Registry checks now use the actual `artifactregistry.googleapis.com/repository/s
 
 After a new build, the tool requires a registry source sample at least as recent as the build's completion before deployment. If reporting lags, the tool stops; it does not delete data or resubmit the build. An unresolved recorded build also prevents a duplicate submission. Image reuse hashes relevant committed build inputs rather than the entire commit, so documentation-only changes reuse a validated, project-scoped image digest.
 
+Registry cleanup policy configuration is now dry-run only. Enabling deletion requires a separate owner decision; provisioning must not silently activate it. This source change does not modify the existing cloud policy while billing is disabled. Review that existing policy as part of the storage gate before any future billing reactivation.
+
 The earlier rollout URL is **https://futurecode-6lhmkv4hnq-uc.a.run.app**, currently unavailable while billing is disabled. Public reading, the database, fixed profiles, private guardian, budget thresholds, the official budget publisher, authenticated probes and private-path protection passed earlier checks. Inbox receipt and an actual emergency shutdown were not independently exercised; do not interpret those historical checks as current monitoring availability.
 
 Production Google sign-in currently returns **`redirect_uri_mismatch`**. A web OAuth client must authorize **`https://futurecode-6lhmkv4hnq-uc.a.run.app/auth/google/callback`**. Google Cloud Console requires private user sign-in before that registration can be completed; no unrelated project's OAuth settings were modified. Do not call authenticated student workflows production-verified yet.
