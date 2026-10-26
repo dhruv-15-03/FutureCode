@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "project": "futurecode-512719",
+  "repository": "https://github.com/dhruv-15-03/FutureCode.git",
+  "region": "us-central1",
+  "billingAccount": "UNVERIFIED",
+  "currency": "INR",
+  "reviewedAt": null,
+  "ownerApproved": false,
+  "approvedOperations": [],
+  "bootstrapExposureApproved": false,
+  "alertInboxReceiptConfirmed": false,
+  "currentEstimatedNetINR": null,
+  "maximumAdditionalEstimatedINR": null,
+  "eligibleBuildMinutesRemaining": null,
+  "registryAccountBytes": null,
+  "reservedImageGrowthBytes": null,
+  "checks": {
+    "invoice": {"status": "unverified", "evidence": ""},
+    "cloudRun": {"status": "unverified", "evidence": ""},
+    "cloudBuild": {"status": "unverified", "evidence": ""},
+    "artifactRegistry": {"status": "unverified", "evidence": ""},
+    "cloudStorage": {"status": "unverified", "evidence": ""},
+    "networkEgress": {"status": "unverified", "evidence": ""},
+    "secretManager": {"status": "unverified", "evidence": ""},
+    "cloudScheduler": {"status": "unverified", "evidence": ""},
+    "pubSub": {"status": "unverified", "evidence": ""},
+    "loggingMonitoring": {"status": "unverified", "evidence": ""}
+  }
+}

@@ -9,7 +9,7 @@ from decimal import Decimal
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "cost_guard"))
-from guard import Config, GuardError, POLICY, month_start, protect
+from guard import Config, GuardError, MeterReading, POLICY, month_start, protect
 
 
 CONFIG = Config("futurecode-test-project", "budget-test-1234", "futurecode-test-state",
@@ -70,7 +70,7 @@ class Backend:
 
     def read_meter(self, name, start, end):
         self.reads.append((name, start, end))
-        return self.meters.get(name, Decimal(0))
+        return MeterReading(Decimal(str(self.meters.get(name, 0))), end)
 
     def disable_quota_alert(self):
         self.policy_disabled += 1
@@ -95,6 +95,43 @@ class CostGuardTest(unittest.TestCase):
                 backend = Backend()
                 self.assertEqual(protect(budget(value), CONFIG, backend, NOW)["action"], "below_target")
                 self.assertEqual(backend.disabled, [])
+
+    def test_budget_observation_records_amount_currency_period_and_notification_freshness(self):
+        backend = Backend()
+        value = budget("1.67")
+        value["message"]["publishTime"] = NOW.isoformat()
+        protect(value, CONFIG, backend, NOW)
+        name, details, identifier = backend.emitted[0]
+        self.assertEqual(name, "futurecode.cost_observation")
+        self.assertEqual(details["amount"], "1.67")
+        self.assertEqual(details["currency"], "INR")
+        self.assertEqual(details["periodStart"], month_start(NOW).isoformat())
+        self.assertEqual(details["notificationPublishedAt"], NOW.isoformat())
+        self.assertEqual(details["receivedAt"], NOW.isoformat())
+        self.assertNotIn("key", details)
+        self.assertTrue(identifier.startswith("cost-"))
+
+    def test_missing_publish_time_is_unknown_not_fabricated(self):
+        backend = Backend()
+        protect(budget("1"), CONFIG, backend, NOW)
+        self.assertIsNone(backend.emitted[0][1]["notificationPublishedAt"])
+
+    def test_invalid_publish_time_and_missing_or_stale_telemetry_are_errors(self):
+        with self.assertRaises(GuardError):
+            protect({**budget(1), "message": {**budget(1)["message"], "publishTime": "invalid"}}, CONFIG, Backend(), NOW)
+        for result in (None, Decimal(0), MeterReading(Decimal(0), NOW.replace(year=2000))):
+            backend = Backend()
+            backend.read_meter = lambda *args: result
+            with self.subTest(result=result), self.assertRaises(GuardError):
+                protect(quota(), CONFIG, backend, NOW)
+            self.assertFalse(backend.saved)
+
+    def test_cost_logging_failure_below_target_is_not_a_successful_observation(self):
+        backend = Backend()
+        backend.log_fails = True
+        with self.assertRaisesRegex(GuardError, "cost_observation_failed"):
+            protect(budget("1.67"), CONFIG, backend, NOW)
+        self.assertFalse(backend.disabled)
 
     def test_mismatched_budget_subscription_currency_and_amount_fail_without_mutation(self):
         cases = [
@@ -175,6 +212,16 @@ class CostGuardTest(unittest.TestCase):
         self.assertEqual(protect(value, CONFIG, backend, NOW)["action"], "permissions_verified")
         self.assertTrue(backend.permissions_verified)
         self.assertFalse(backend.disabled)
+
+    def test_probe_correlation_is_preserved_and_invalid_probe_ids_are_rejected(self):
+        backend = Backend()
+        value = event({"kind": "readiness-check"}, {"futurecodeEvent": "readiness-check", "futurecodeProbe": "a" * 32})
+        self.assertEqual(protect(value, CONFIG, backend, NOW)["probeId"], "a" * 32)
+        value["message"]["attributes"]["futurecodeProbe"] = "invalid"
+        backend.permissions_verified = False
+        with self.assertRaisesRegex(GuardError, "invalid_probe_id"):
+            protect(value, CONFIG, backend, NOW)
+        self.assertFalse(backend.permissions_verified)
 
     def test_optional_quota_alert_is_retired_before_announced_future_alerting_fees(self):
         backend = Backend()

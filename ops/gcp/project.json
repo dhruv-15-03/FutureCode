@@ -1,5 +1,6 @@
 {
   "project": "futurecode-512719",
+  "cloud_changes_enabled": false,
   "region": "us-central1",
   "service": "futurecode",
   "repository": "https://github.com/dhruv-15-03/FutureCode.git",

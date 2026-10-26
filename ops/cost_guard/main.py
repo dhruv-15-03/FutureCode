@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import sys
 from decimal import Decimal
 
@@ -27,15 +28,22 @@ def protect_futurecode(request):
         backend = GcpBackend(config)
         result = protect(event, config, backend)
         if result["action"] not in {"project_billing_disabled", "already_disabled"}:
-            backend.emit("futurecode.guard_check", {"action": result["action"]},
+            backend.emit("futurecode.guard_check", {"action": result["action"], "probeId": result.get("probeId")},
                          f"check-{event.get('message', {}).get('messageId', 'manual')}")
         return "", 204
     except (GuardError, KeyError) as error:
         code = str(error) if isinstance(error, GuardError) else "missing_guard_configuration"
         details = {"event": "futurecode.guard_failure", "code": code}
+        if isinstance(locals().get("event"), dict):
+            message = event.get("message")
+            attributes = message.get("attributes") if isinstance(message, dict) else None
+            candidate = attributes.get("futurecodeProbe") if isinstance(attributes, dict) else None
+            if isinstance(candidate, str) and re.fullmatch(r"[a-f0-9]{32}", candidate):
+                details["probeId"] = candidate
         try:
             if "backend" in locals():
-                backend.emit("futurecode.guard_failure", {"code": code}, "failure-" + code)
+                backend.emit("futurecode.guard_failure", {key: value for key, value in details.items() if key != "event"},
+                             "failure-" + code)
         except GuardError:
             details["failureNotification"] = "logging_api_unavailable"
         print(json.dumps(details), file=sys.stderr)

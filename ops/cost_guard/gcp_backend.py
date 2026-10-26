@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timedelta
 from decimal import Decimal
 from urllib.parse import quote
 
@@ -7,7 +8,7 @@ from google.auth.exceptions import GoogleAuthError
 from google.auth.transport.requests import AuthorizedSession
 from requests import RequestException
 
-from guard import GuardError, amount
+from guard import GuardError, MeterReading, amount
 
 
 class GcpBackend:
@@ -118,21 +119,63 @@ class GcpBackend:
             "view": "FULL",
             "pageSize": "100"
         }
-        total = Decimal(0)
+        total, observed = Decimal(0), False
         for _ in range(5):
             result = self.request("GET", f"https://monitoring.googleapis.com/v3/projects/{self.config.project}/timeSeries", params=params)
-            for series in result.get("timeSeries", []):
-                if series.get("metricKind") != "DELTA":
+            series_list = result.get("timeSeries")
+            if not isinstance(series_list, list):
+                raise GuardError("telemetry_unavailable")
+            for series in series_list:
+                if not isinstance(series, dict) or series.get("metricKind") != "DELTA":
                     raise GuardError("unexpected_metric_kind")
-                for point in series.get("points", []):
-                    value = point.get("value", {})
+                points = series.get("points")
+                if not isinstance(points, list) or not points:
+                    raise GuardError("telemetry_unavailable")
+                for point in points:
+                    value = point.get("value") if isinstance(point, dict) else None
+                    if not isinstance(value, dict):
+                        raise GuardError("invalid_metric_value")
                     numeric = value.get("int64Value", value.get("doubleValue"))
                     if numeric is None:
                         raise GuardError("invalid_metric_value")
                     total += amount(numeric)
+                    observed = True
             cursor = result.get("nextPageToken")
             if not cursor:
-                return total
+                if not observed:
+                    raise GuardError("telemetry_unavailable")
+                fresh_params = {
+                    "filter": params["filter"], "view": "FULL", "pageSize": "1000",
+                    "interval.startTime": max(start, end - timedelta(minutes=15)).isoformat(),
+                    "interval.endTime": end.isoformat()
+                }
+                recent = self.request("GET", f"https://monitoring.googleapis.com/v3/projects/{self.config.project}/timeSeries",
+                                      params=fresh_params)
+                if recent.get("nextPageToken"):
+                    raise GuardError("telemetry_freshness_incomplete")
+                dates = []
+                try:
+                    for row in recent.get("timeSeries", []):
+                        if row.get("metricKind") != "DELTA":
+                            raise GuardError("unexpected_metric_kind")
+                        for point in row.get("points", []):
+                            value = point.get("value")
+                            if not isinstance(value, dict):
+                                raise GuardError("invalid_metric_value")
+                            amount(value.get("int64Value", value.get("doubleValue")))
+                            at = datetime.fromisoformat(point["interval"]["endTime"].replace("Z", "+00:00"))
+                            if at.tzinfo is None:
+                                raise ValueError()
+                            dates.append(at)
+                except (KeyError, TypeError, ValueError, AttributeError):
+                    raise GuardError("invalid_telemetry_timestamp") from None
+                if not dates:
+                    raise GuardError("telemetry_unavailable")
+                latest = max(dates)
+                age = (end - latest).total_seconds()
+                if age < -60 or age > 900:
+                    raise GuardError("telemetry_stale")
+                return MeterReading(total, latest)
             if not isinstance(cursor, str) or len(cursor) > 4096:
                 raise GuardError("invalid_metric_cursor")
             params["pageToken"] = cursor

@@ -9,11 +9,13 @@ import subprocess
 import sys
 import tempfile
 import time
-from datetime import datetime, timezone
+import uuid
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import urlparse
 
 import requests
+from review import ReviewError, number as review_number, validate_review
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -28,14 +30,32 @@ APIS = [
     "cloudscheduler.googleapis.com", "monitoring.googleapis.com", "logging.googleapis.com",
     "secretmanager.googleapis.com"
 ]
+READ_ONLY_COMMANDS = (
+    ("auth", "list"), ("auth", "print-access-token"),
+    ("projects", "describe"),
+    ("billing", "projects", "describe"), ("billing", "accounts", "describe"), ("billing", "accounts", "list"),
+    ("services", "list"), ("builds", "list"),
+    ("iam", "service-accounts", "list"), ("iam", "roles", "list"),
+    ("storage", "buckets", "list"), ("storage", "buckets", "describe"),
+    ("artifacts", "repositories", "list"), ("artifacts", "repositories", "describe"),
+    ("artifacts", "docker", "images", "list"),
+    ("run", "services", "list"), ("run", "services", "describe"), ("run", "services", "get-iam-policy"),
+    ("pubsub", "topics", "get-iam-policy"), ("secrets", "list"), ("secrets", "versions", "list"),
+    ("logging", "read")
+)
 
 
 class DeployError(Exception):
     pass
 
 
+def require_cloud_changes():
+    if PROJECT.get("cloud_changes_enabled") is not True:
+        raise DeployError("cloud_changes_blocked_pending_explicit_approval")
+
+
 class Deployment:
-    def __init__(self, project, region, state_file=None):
+    def __init__(self, project, region, state_file=None, cost_review_file=None):
         if not re.fullmatch(r"[a-z][a-z0-9-]{4,28}[a-z0-9]", project):
             raise DeployError("invalid_project")
         approved = os.environ.get("FUTURECODE_APPROVED_GCP_PROJECT")
@@ -55,6 +75,9 @@ class Deployment:
         self.billing_account = None
         self.currency = None
         self.state_file = Path(state_file).resolve() if state_file else None
+        self.cost_review_file = Path(cost_review_file).resolve() if cost_review_file else None
+        if self.cost_review_file and (self.cost_review_file == ROOT or ROOT in self.cost_review_file.parents):
+            raise DeployError("cost_review_must_be_outside_repository")
         if self.state_file and (self.state_file == ROOT or ROOT in self.state_file.parents):
             raise DeployError("deployment_state_must_be_outside_repository")
         self.state = {}
@@ -75,6 +98,8 @@ class Deployment:
         self.app_identity = f"futurecode-app@{project}.iam.gserviceaccount.com"
 
     def gcloud(self, *arguments, raw=False, input_bytes=None, timeout=180):
+        if not any(arguments[:len(prefix)] == prefix for prefix in READ_ONLY_COMMANDS):
+            require_cloud_changes()
         command = [*self.command, *arguments, f"--project={self.project}", "--quiet"]
         if not raw:
             command.append("--format=json")
@@ -96,6 +121,8 @@ class Deployment:
             raise DeployError("gcloud_invalid_json") from None
 
     def api(self, method, url, *, body=None, params=None, allow_missing=False):
+        if method != "GET":
+            require_cloud_changes()
         origins = {
             "https://cloudbilling.googleapis.com/",
             "https://billingbudgets.googleapis.com/",
@@ -139,7 +166,7 @@ class Deployment:
         self.project_number = str(project["projectNumber"])
         linked = self.gcloud("billing", "projects", "describe", self.project)
         if linked.get("billingEnabled") is not True:
-            raise DeployError("billing_not_enabled_user_verification_required")
+            raise DeployError("project_billing_disabled_leave_disabled")
         account = linked.get("billingAccountName", "")
         if not re.fullmatch(r"billingAccounts/[A-Z0-9-]+", account):
             raise DeployError("invalid_linked_billing_account")
@@ -154,6 +181,7 @@ class Deployment:
             "monthlyNetTarget": POLICY["monthly_net_target"],
             "spendAlerts": POLICY["spend_alerts"],
             "nativeGrossCapEnabled": False,
+            "cloudChangesEnabled": PROJECT.get("cloud_changes_enabled") is True,
             "cloudResourcesCreatedByPreflight": False
         }
 
@@ -164,6 +192,44 @@ class Deployment:
         temporary = self.state_file.with_suffix(".tmp")
         temporary.write_text(json.dumps(self.state, indent=2), "utf-8")
         temporary.replace(self.state_file)
+
+    def require_cost_review(self, operation, *, registry_bytes=None):
+        file = getattr(self, "cost_review_file", None)
+        if file is None:
+            raise DeployError("external_owner_cost_review_required")
+        try:
+            if file.stat().st_size > 32768:
+                raise DeployError("cost_review_too_large")
+            data = json.loads(file.read_text("utf-8"))
+            fingerprint = validate_review(data, project=self.project, repository=EXPECTED_REMOTE, region=self.region,
+                                          billing_account=self.billing_account, operation=operation)
+            if registry_bytes is not None and registry_bytes > review_number(data["registryAccountBytes"]):
+                raise DeployError("cost_review_understates_current_registry_usage")
+            return fingerprint
+        except ReviewError as error:
+            raise DeployError(str(error)) from None
+        except (OSError, ValueError):
+            raise DeployError("cost_review_unreadable") from None
+
+    def require_fresh_protection(self, now=None):
+        now = now or datetime.now(timezone.utc)
+        proof = self.state.get("protectionAttestation")
+        expected = {"project": self.project, "budget": self.state.get("budget"),
+                    "guardUrl": self.state.get("guardUrl"), "billingAccount": self.billing_account}
+        if not isinstance(proof, dict) or any(proof.get(key) != value or not value for key, value in expected.items()):
+            raise DeployError("fresh_project_bound_protection_required")
+        try:
+            verified = datetime.fromisoformat(proof["verifiedAt"].replace("Z", "+00:00"))
+            if (verified.tzinfo is None or
+                not isinstance(proof.get("guardRevision"), str) or
+                not re.fullmatch(re.escape(self.guard_service) + r"-[a-z0-9-]+", proof["guardRevision"]) or
+                not isinstance(proof.get("probeId"), str) or not re.fullmatch(r"[a-f0-9]{32}", proof["probeId"])):
+                raise ValueError()
+            age = (now - verified).total_seconds()
+        except (KeyError, TypeError, ValueError, AttributeError):
+            raise DeployError("invalid_protection_attestation") from None
+        if age < -60 or age > 300:
+            raise DeployError("protection_verification_expired")
 
     def owned(self, resource):
         if any(resource.get("labels", {}).get(key) != value for key, value in LABELS.items()):
@@ -282,6 +348,7 @@ class Deployment:
         return budget["name"].split("/")[-1]
 
     def infrastructure(self):
+        require_cloud_changes()
         self.gcloud("services", "enable", *APIS, timeout=360)
         for name in ("futurecode-cost-guard", "futurecode-cost-invoke", "futurecode-build", "futurecode-app"):
             self.account(name)
@@ -334,24 +401,98 @@ class Deployment:
         self.state["stateBucket"] = self.bucket
         self.save()
 
-    def source_image(self, target):
+    def budget_foundation(self):
+        self.gcloud("services", "enable", "cloudbilling.googleapis.com", "billingbudgets.googleapis.com",
+                    "monitoring.googleapis.com", "pubsub.googleapis.com", timeout=360)
+        topic = self.api("GET", "https://pubsub.googleapis.com/v1/" + self.topic, allow_missing=True)
+        if topic is None:
+            self.api("PUT", "https://pubsub.googleapis.com/v1/" + self.topic, body={"name": self.topic, "labels": LABELS})
+        else:
+            self.owned(topic)
+        return self.notification_channel()
+
+    def registry_footprint(self, now=None, *, not_before=None):
+        now = now or datetime.now(timezone.utc)
+        data = self.api("GET", f"https://monitoring.googleapis.com/v3/projects/{self.project}/timeSeries", params={
+            "filter": 'metric.type="artifactregistry.googleapis.com/repository/size" AND resource.type="artifactregistry.googleapis.com/Repository"',
+            "interval.startTime": (now - timedelta(hours=2)).isoformat(),
+            "interval.endTime": now.isoformat(),
+            "view": "FULL", "pageSize": "1000"
+        })
+        series = data.get("timeSeries")
+        if data.get("nextPageToken") or not isinstance(series, list) or not series:
+            raise DeployError("registry_storage_measurement_incomplete")
+        total, samples = 0, []
+        for row in series:
+            if row.get("metricKind") != "GAUGE" or not row.get("points"):
+                raise DeployError("registry_storage_measurement_incomplete")
+            try:
+                points = [(datetime.fromisoformat(point["interval"]["endTime"].replace("Z", "+00:00")), point["value"]["int64Value"])
+                          for point in row["points"]]
+                at, raw = max(points, key=lambda item: item[0])
+                if at.tzinfo is None or not re.fullmatch(r"[0-9]+", str(raw)):
+                    raise ValueError()
+                size = int(raw)
+                age = (now - at).total_seconds()
+            except (KeyError, TypeError, ValueError, AttributeError):
+                raise DeployError("invalid_registry_storage_measurement") from None
+            if age < -60 or age > 3600:
+                raise DeployError("registry_storage_measurement_stale")
+            if not_before is not None and at < not_before:
+                raise DeployError("post_build_registry_measurement_not_available")
+            total += size
+            samples.append(at.isoformat())
+        if total >= 512 * 1024 * 1024:
+            raise DeployError("registry_storage_at_or_above_free_baseline")
+        return {"reportedBytes": total, "sampleTimes": samples, "accountWideFreeBalanceVerified": False}
+
+    def build_input_fingerprint(self, target, revision="HEAD"):
+        if target not in {"app", "cost-guard"} or (revision != "HEAD" and not re.fullmatch(r"[a-f0-9]{40,64}", revision)):
+            raise DeployError("invalid_build_input_revision")
+        paths = [".dockerignore", "Dockerfile", "pom.xml", "src/main", "src/test", "public"] if target == "app" else [
+            ".dockerignore", "ops/cost_guard"
+        ]
+        result = subprocess.run(["git", "ls-tree", "-r", "-z", revision, "--", *paths], cwd=ROOT,
+                                capture_output=True, check=True)
+        if not result.stdout:
+            raise DeployError("build_inputs_missing")
+        return hashlib.sha256(b"futurecode-build-inputs-v1\0" + target.encode() + b"\0" + result.stdout).hexdigest()
+
+    def current_commit(self):
+        result = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, check=True)
+        commit = result.stdout.decode().strip()
+        if not re.fullmatch(r"[a-f0-9]{40,64}", commit):
+            raise DeployError("invalid_release_commit")
+        return commit
+
+    def require_release_verification(self, commit):
+        if not re.fullmatch(r"[a-f0-9]{40,64}", commit):
+            raise DeployError("invalid_release_commit")
+        url = "https://api.github.com/repos/dhruv-15-03/FutureCode/actions/workflows/verify.yml/runs"
+        try:
+            response = requests.get(url, params={"head_sha": commit, "branch": "main", "event": "push",
+                                                "status": "success", "per_page": 10},
+                                    headers={"Accept": "application/vnd.github+json"},
+                                    timeout=(5, 20), allow_redirects=False)
+            if response.status_code != 200:
+                raise DeployError("release_ci_unavailable")
+            data = response.json()
+        except (requests.RequestException, ValueError):
+            raise DeployError("release_ci_unavailable") from None
+        runs = data.get("workflow_runs")
+        if not isinstance(runs, list) or not any(
+            row.get("head_sha") == commit and row.get("head_branch") == "main" and
+            row.get("event") == "push" and row.get("status") == "completed" and row.get("conclusion") == "success" and
+            row.get("path") == ".github/workflows/verify.yml" and
+            row.get("head_repository", {}).get("full_name") == "dhruv-15-03/FutureCode"
+            for row in runs
+        ):
+            raise DeployError("successful_release_ci_required")
+
+    def build_request(self, target, commit, tag, object_name):
         if target not in {"app", "cost-guard"}:
             raise DeployError("unknown_build_target")
-        if subprocess.run(["git", "status", "--porcelain"], cwd=ROOT, capture_output=True, check=True).stdout:
-            raise DeployError("commit_source_before_building")
-        commit = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, check=True).stdout.decode().strip()
-        tag = f"{self.region}-docker.pkg.dev/{self.project}/{self.repository}/{target}:{commit[:12]}"
-        old = self.state.get("images", {}).get(target)
-        if old and old.get("commit") == commit:
-            return old["image"]
-        with tempfile.TemporaryDirectory(prefix="futurecode-source-") as directory:
-            archive = Path(directory) / "source.tar.gz"
-            with archive.open("wb") as output:
-                subprocess.run(["git", "archive", "--format=tar.gz", "HEAD"], cwd=ROOT,
-                               stdout=output, stderr=subprocess.PIPE, check=True)
-            object_name = f"sources/{commit}.tar.gz"
-            self.gcloud("storage", "cp", str(archive), f"gs://{self.bucket}/{object_name}", raw=True)
-        build = self.api("POST", f"https://cloudbuild.googleapis.com/v1/projects/{self.project}/locations/{self.region}/builds", body={
+        return {
             "source": {"storageSource": {"bucket": self.bucket, "object": object_name}},
             "steps": [{
                 "name": "gcr.io/cloud-builders/docker",
@@ -360,9 +501,51 @@ class Deployment:
             }],
             "images": [tag], "timeout": "900s",
             "serviceAccount": f"projects/{self.project}/serviceAccounts/{self.build_identity}",
-            "options": {"logging": "CLOUD_LOGGING_ONLY", "machineType": "E2_MEDIUM"},
+            "options": {"logging": "CLOUD_LOGGING_ONLY", "machineType": "E2_STANDARD_2"},
             "tags": ["futurecode", target]
-        })
+        }
+
+    def source_image(self, target):
+        require_cloud_changes()
+        if target not in {"app", "cost-guard"}:
+            raise DeployError("unknown_build_target")
+        self.require_cost_review("bootstrap" if target == "cost-guard" else "application")
+        if target == "app":
+            self.require_fresh_protection()
+        storage = self.registry_footprint()
+        self.require_cost_review("bootstrap" if target == "cost-guard" else "application",
+                                 registry_bytes=storage["reportedBytes"])
+        if subprocess.run(["git", "status", "--porcelain"], cwd=ROOT, capture_output=True, check=True).stdout:
+            raise DeployError("commit_source_before_building")
+        commit = self.current_commit()
+        self.require_release_verification(commit)
+        fingerprint = self.build_input_fingerprint(target)
+        tag = f"{self.region}-docker.pkg.dev/{self.project}/{self.repository}/{target}:{commit[:12]}"
+        if self.state.get("activeBuild"):
+            raise DeployError("unresolved_cloud_build_review_required")
+        old = self.state.get("images", {}).get(target)
+        if old:
+            old_fingerprint = old.get("buildInputsSha256")
+            if old_fingerprint is None and re.fullmatch(r"[a-f0-9]{40,64}", old.get("commit", "")):
+                old_fingerprint = self.build_input_fingerprint(target, old["commit"])
+            prefix = f"{self.region}-docker.pkg.dev/{self.project}/{self.repository}/{target}@"
+            if old_fingerprint == fingerprint:
+                if not isinstance(old.get("image"), str) or not re.fullmatch(re.escape(prefix) + r"sha256:[a-f0-9]{64}", old["image"]):
+                    raise DeployError("cached_image_scope_mismatch")
+                if old.get("buildFinishedAt"):
+                    self.registry_footprint(not_before=datetime.fromisoformat(old["buildFinishedAt"]))
+                self.state["images"][target]["buildInputsSha256"] = fingerprint
+                self.save()
+                return old["image"]
+        with tempfile.TemporaryDirectory(prefix="futurecode-source-") as directory:
+            archive = Path(directory) / "source.tar.gz"
+            with archive.open("wb") as output:
+                subprocess.run(["git", "archive", "--format=tar.gz", "HEAD"], cwd=ROOT,
+                               stdout=output, stderr=subprocess.PIPE, check=True)
+            object_name = f"sources/{commit}.tar.gz"
+            self.gcloud("storage", "cp", str(archive), f"gs://{self.bucket}/{object_name}", raw=True)
+        build = self.api("POST", f"https://cloudbuild.googleapis.com/v1/projects/{self.project}/locations/{self.region}/builds",
+                         body=self.build_request(target, commit, tag, object_name))
         build_name = build.get("metadata", {}).get("build", {}).get("name")
         if not build_name:
             raise DeployError("build_operation_missing")
@@ -376,9 +559,20 @@ class Deployment:
                 if not isinstance(digest, str) or not re.fullmatch(r"sha256:[a-f0-9]{64}", digest):
                     raise DeployError("built_image_digest_missing")
                 image = tag.rsplit(":", 1)[0] + "@" + digest
-                self.state.setdefault("images", {})[target] = {"image": image, "commit": commit}
+                finished = current.get("finishTime")
+                try:
+                    finished_at = datetime.fromisoformat(finished.replace("Z", "+00:00"))
+                    if finished_at.tzinfo is None:
+                        raise ValueError()
+                except (ValueError, TypeError, AttributeError):
+                    raise DeployError("build_finish_time_missing") from None
+                self.state.setdefault("images", {})[target] = {
+                    "image": image, "commit": commit, "buildInputsSha256": fingerprint,
+                    "buildFinishedAt": finished_at.isoformat()
+                }
                 self.state.pop("activeBuild", None)
                 self.save()
+                self.registry_footprint(not_before=finished_at)
                 return image
             if status not in {"STATUS_UNKNOWN", "PENDING", "QUEUED", "WORKING"}:
                 raise DeployError("image_build_" + str(status).lower())
@@ -386,6 +580,13 @@ class Deployment:
         raise DeployError("image_build_timeout")
 
     def service_deploy(self, name, image, identity, variables, *, secrets=None):
+        require_cloud_changes()
+        self.require_cost_review("application" if name == self.service else "bootstrap")
+        if name == self.service:
+            self.require_fresh_protection()
+        target = "app" if name == self.service else "cost-guard"
+        finished = self.state.get("images", {}).get(target, {}).get("buildFinishedAt")
+        self.registry_footprint(not_before=datetime.fromisoformat(finished) if finished else None)
         if name == self.service:
             document = self.app_service_document(image, identity, variables, secrets)
             with tempfile.TemporaryDirectory(prefix="futurecode-service-") as directory:
@@ -457,10 +658,14 @@ class Deployment:
         return url
 
     def protect(self):
-        self.infrastructure()
-        channel = self.notification_channel()
-        alert = self.quota_alert(channel)
+        require_cloud_changes()
+        self.require_cost_review("bootstrap")
+        self.require_release_verification(self.current_commit())
+        self.registry_footprint()
+        channel = self.budget_foundation()
         budget_id = self.budget(channel)
+        alert = self.quota_alert(channel)
+        self.infrastructure()
         self.save()
         image = self.source_image("cost-guard")
         url = self.service_deploy(self.guard_service, image, self.guard_identity, {
@@ -517,15 +722,22 @@ class Deployment:
                 "spendAlertThresholds": POLICY["spend_alerts"], "netShutdownTarget": "5",
                 "finalInvoiceCapGuaranteed": False}
 
-    def publish_check(self, kind):
+    def publish_check(self, kind, probe_id=None):
         if kind not in {"readiness-check", "quota-check"}:
             raise DeployError("invalid_protection_probe")
+        require_cloud_changes()
+        attributes = {"futurecodeEvent": kind}
+        if probe_id is not None:
+            if not re.fullmatch(r"[a-f0-9]{32}", probe_id):
+                raise DeployError("invalid_probe_id")
+            attributes["futurecodeProbe"] = probe_id
         return self.api("POST", "https://pubsub.googleapis.com/v1/" + self.topic + ":publish", body={
             "messages": [{"data": base64.b64encode(json.dumps({"kind": kind}).encode()).decode(),
-                          "attributes": {"futurecodeEvent": kind}}]
+                          "attributes": attributes}]
         })
 
     def secret(self, name, data=None, file=None):
+        require_cloud_changes()
         existing = self.gcloud("secrets", "list", "--filter=name:" + name)
         match = [row for row in existing if row["name"].endswith("/" + name)]
         if match:
@@ -544,9 +756,16 @@ class Deployment:
         return result["name"].split("/")[-1]
 
     def application(self, private_config, ca_file):
-        if not self.state.get("guardUrl") or not self.state.get("budget") or not self.state.get("protectionVerified"):
+        if not self.state.get("guardUrl") or not self.state.get("budget"):
             raise DeployError("cost_protection_required_before_app")
+        require_cloud_changes()
+        self.require_cost_review("application")
+        self.require_release_verification(self.current_commit())
+        self.verify_protection()
+        self.require_fresh_protection()
         image = self.source_image("app")
+        self.verify_protection()
+        self.require_fresh_protection()
         config_name = "futurecode-config"
         ca_name = "futurecode-mysql-ca"
         known = self.state.get("secrets", {})
@@ -598,6 +817,11 @@ class Deployment:
                 "credentialsPrinted": False, "executionEnabled": False, "paymentsEnabled": False}
 
     def verify_protection(self):
+        require_cloud_changes()
+        self.require_cost_review("probes")
+        self.state.pop("protectionAttestation", None)
+        self.state.pop("protectionVerified", None)
+        self.save()
         if not self.state.get("budget") or not self.state.get("guardUrl"):
             raise DeployError("protection_not_provisioned")
         budget = self.api("GET", "https://billingbudgets.googleapis.com/v1/" + self.state["budget"])
@@ -634,13 +858,15 @@ class Deployment:
         if unauthenticated.status_code != 403:
             raise DeployError("private_guard_did_not_reject_anonymous_access")
         started = datetime.now(timezone.utc).isoformat()
-        self.publish_check("readiness-check")
-        self.publish_check("quota-check")
+        probe_id = uuid.uuid4().hex
+        self.publish_check("readiness-check", probe_id)
+        self.publish_check("quota-check", probe_id)
         observed = set()
         for _ in range(25):
             query = (
                 f'logName="projects/{self.project}/logs/futurecode-cost-guard" '
                 f'AND timestamp>="{started}" AND '
+                f'jsonPayload.probeId="{probe_id}" AND '
                 '(jsonPayload.event="futurecode.guard_check" OR jsonPayload.event="futurecode.guard_failure")'
             )
             rows = self.gcloud("logging", "read", query, "--limit=20", "--order=desc")
@@ -652,6 +878,12 @@ class Deployment:
             observed.update(row.get("jsonPayload", {}).get("action") for row in rows)
             if {"permissions_verified", "quota_checked"} <= observed:
                 self.state["protectionVerified"] = datetime.now(timezone.utc).isoformat()
+                self.state["protectionAttestation"] = {
+                    "project": self.project, "billingAccount": self.billing_account,
+                    "budget": self.state["budget"], "guardUrl": self.state["guardUrl"],
+                    "guardRevision": service["status"]["latestReadyRevisionName"],
+                    "probeId": probe_id, "verifiedAt": self.state["protectionVerified"]
+                }
                 self.save()
                 return {
                     "project": self.project, "projectScopedBudgetVerified": True,
@@ -716,13 +948,16 @@ def main():
     parser.add_argument("--region", default="us-central1")
     parser.add_argument("--phase", choices=["plan", "protect", "app", "verify"], default="plan")
     parser.add_argument("--state-file")
+    parser.add_argument("--cost-review-file")
     parser.add_argument("--private-config", default=str(ROOT / ".env"))
     parser.add_argument("--mysql-ca", default=str(ROOT / "certs" / "mysql-ca.pem"))
     parser.add_argument("--accept-estimated-target-risk", action="store_true")
     args = parser.parse_args()
+    if args.phase != "plan":
+        require_cloud_changes()
     if args.phase != "plan" and not args.accept_estimated_target_risk:
         raise DeployError("explicit_estimated_target_risk_acceptance_required")
-    deployment = Deployment(args.project, args.region, args.state_file)
+    deployment = Deployment(args.project, args.region, args.state_file, args.cost_review_file)
     plan = deployment.preflight()
     if args.phase == "plan":
         print(json.dumps(plan))

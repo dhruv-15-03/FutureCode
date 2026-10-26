@@ -34,6 +34,19 @@ class GuardHttpTest(unittest.TestCase):
                     self.assertEqual(body["code"], error)
                     backend.assert_not_called()
 
+    def test_invalid_message_envelope_has_a_sanitized_failure(self):
+        value = {"subscription": "wrong", "message": ["invalid"]}
+        environment = {
+            "TARGET_PROJECT": "futurecode-test-project", "EXPECTED_BUDGET_ID": "fixture-budget-123",
+            "STATE_BUCKET": "fixture-state-bucket", "APP_SERVICE_NAME": "futurecode",
+            "QUOTA_ALERT_POLICY": "projects/futurecode-test-project/alertPolicies/123"
+        }
+        with self.app.test_request_context("/", method="POST", content_type="application/json", data=json.dumps(value)):
+            with patch.dict(os.environ, environment), patch.object(main, "GcpBackend"):
+                body, code = main.protect_futurecode.__wrapped__(request)
+                self.assertEqual(code, 500)
+                self.assertEqual(body["code"], "unexpected_subscription")
+
     def test_valid_authenticated_subscription_envelope_performs_readiness_only(self):
         project = "futurecode-test-project"
         value = {

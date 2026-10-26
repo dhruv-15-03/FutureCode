@@ -1,5 +1,6 @@
 import base64
 import binascii
+import hashlib
 import json
 import re
 import sys
@@ -12,6 +13,12 @@ from zoneinfo import ZoneInfo
 
 class GuardError(Exception):
     pass
+
+
+@dataclass(frozen=True)
+class MeterReading:
+    value: Decimal
+    observed_at: datetime
 
 
 POLICY = json.loads(Path(__file__).with_name("policy.json").read_text("utf-8"))
@@ -85,15 +92,18 @@ def protect(event, config, backend, now=None):
     if not isinstance(event, dict) or event.get("subscription") != expected_subscription:
         raise GuardError("unexpected_subscription")
     body, attributes = decode_event(event)
+    probe_id = attributes.get("futurecodeProbe")
+    if probe_id is not None and (not isinstance(probe_id, str) or not re.fullmatch(r"[a-f0-9]{32}", probe_id)):
+        raise GuardError("invalid_probe_id")
     if attributes.get("futurecodeEvent") == "readiness-check":
         if body != {"kind": "readiness-check"}:
             raise GuardError("invalid_readiness_event")
         backend.verify_permissions()
-        return {"action": "permissions_verified"}
+        return {"action": "permissions_verified", "probeId": probe_id}
     if attributes.get("futurecodeEvent") == "quota-check":
         if body != {"kind": "quota-check"}:
             raise GuardError("invalid_quota_event")
-        return check_quota(config, backend, now)
+        return {**check_quota(config, backend, now), "probeId": probe_id}
     if attributes.get("budgetId") != config.budget_id or attributes.get("schemaVersion") != "1.0":
         raise GuardError("unexpected_budget")
     if body.get("currencyCode") != POLICY["currency"]:
@@ -112,6 +122,30 @@ def protect(event, config, backend, now=None):
     if interval != start:
         raise GuardError("unexpected_billing_period")
     cost = amount(body.get("costAmount"))
+    published = event["message"].get("publishTime")
+    if published is not None:
+        try:
+            published_at = datetime.fromisoformat(published.replace("Z", "+00:00"))
+            if published_at.tzinfo is None:
+                raise ValueError()
+            published = published_at.astimezone(timezone.utc).isoformat()
+        except (ValueError, TypeError, AttributeError):
+            raise GuardError("invalid_notification_time") from None
+    observation = {
+        "amount": str(cost), "currency": POLICY["currency"], "periodStart": interval.isoformat(),
+        "notificationPublishedAt": published, "receivedAt": now.astimezone(timezone.utc).isoformat(),
+        "usageReportingFreshness": "Not supplied by the budget notification; estimated costs can arrive late."
+    }
+    message_id = event["message"].get("messageId", "")
+    if not isinstance(message_id, str) or len(message_id) > 256:
+        raise GuardError("invalid_message_id")
+    observation_id = hashlib.sha256((config.budget_id + ":" + message_id + ":" + str(cost)).encode()).hexdigest()
+    try:
+        backend.emit("futurecode.cost_observation", observation, "cost-" + observation_id)
+    except GuardError:
+        if cost < amount(POLICY["monthly_net_target"]):
+            raise GuardError("cost_observation_failed") from None
+        print(json.dumps({"event": "futurecode.guard_failure", "code": "cost_observation_failed"}), file=sys.stderr)
     if cost < amount(POLICY["monthly_net_target"]):
         return {"action": "below_target"}
     try:
@@ -154,12 +188,20 @@ def check_quota(config, backend, now):
     usage, newly_crossed, samples = {}, [], {}
     for meter in POLICY["meters"]:
         if meter["metric"] not in samples:
-            samples[meter["metric"]] = amount(backend.read_meter(meter["metric"], start, now))
-        raw = samples[meter["metric"]]
+            reading = backend.read_meter(meter["metric"], start, now)
+            if not isinstance(reading, MeterReading) or reading.observed_at.tzinfo is None:
+                raise GuardError("telemetry_unavailable")
+            age = (now - reading.observed_at).total_seconds()
+            if age < -60 or age > 900:
+                raise GuardError("telemetry_stale")
+            samples[meter["metric"]] = reading
+        reading = samples[meter["metric"]]
+        raw = amount(reading.value)
         if raw < 0:
             raise GuardError("negative_usage")
         used = raw / amount(meter["divisor"])
-        usage[meter["name"]] = {"used": str(used), "monthlyAllowance": meter["monthly_free"]}
+        usage[meter["name"]] = {"used": str(used), "monthlyAllowance": meter["monthly_free"],
+                               "observedAt": reading.observed_at.isoformat()}
         if used >= amount(meter["monthly_free"]) * amount(POLICY["warning_fraction"]) and meter["name"] not in crossed:
             newly_crossed.append(meter["name"])
     if newly_crossed:
